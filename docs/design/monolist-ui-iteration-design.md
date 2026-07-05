@@ -2,7 +2,7 @@
 
 > 状态：持续补充  
 > 首次确认日期：2026-07-05  
-> 当前确认范围：今天视图、新增草稿、已完成任务与历史记录的展示逻辑  
+> 当前确认范围：今天视图、新增草稿、已完成任务与历史记录的展示逻辑
 > 对应代码稿：`docs/design/completed-tasks-reference.html`、`docs/design/task-input-reference.html`
 
 ## 1. 文档用途
