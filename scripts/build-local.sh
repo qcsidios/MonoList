@@ -30,6 +30,12 @@ swiftc \
   "${SWIFT_SOURCES[@]}" \
   -o "$EXECUTABLE"
 
+ICON_PLIST=""
+if [[ -f "$ROOT_DIR/MonoList/Resources/AppIcon.icns" ]]; then
+  cp "$ROOT_DIR/MonoList/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+  ICON_PLIST=$'    <key>CFBundleIconFile</key>\\n    <string>AppIcon.icns</string>'
+fi
+
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -41,6 +47,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
     <string>MonoList</string>
     <key>CFBundleExecutable</key>
     <string>MonoList</string>
+$ICON_PLIST
     <key>CFBundleIdentifier</key>
     <string>com.qingcheng.monolist.mac</string>
     <key>CFBundleInfoDictionaryVersion</key>
