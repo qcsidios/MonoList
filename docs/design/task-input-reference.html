@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MonoList 内联输入设计基准</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --text: #171717;
+      --secondary: #777a7f;
+      --tertiary: #9a9da2;
+      --surface: rgba(255,255,255,.70);
+      --row: rgba(255,255,255,.72);
+      --stroke: rgba(0,0,0,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 40px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 16% 16%, rgba(255,255,255,.95), transparent 36%),
+        linear-gradient(145deg,#e6e8eb,#ccd2d8);
+    }
+    header { max-width: 880px; margin: 0 auto 30px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    header p { margin: 0; color: var(--secondary); }
+    .states {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(360px, 1fr));
+      gap: 30px;
+      max-width: 880px;
+      margin: auto;
+      align-items: start;
+    }
+    .label { margin: 0 0 9px; color: var(--secondary); font-size: 13px; font-weight: 600; }
+    .panel {
+      width: 360px;
+      margin: auto;
+      padding: 16px;
+      border: 1px solid var(--stroke);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: 0 18px 45px rgba(0,0,0,.14);
+      backdrop-filter: blur(24px) saturate(1.25);
+    }
+    .panel.empty { min-height: 148px; }
+    .panel.filled { min-height: 356px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .topbar strong { font-size:19px; }
+    .date { color:var(--secondary); font-size:12px; }
+    .rows { display:grid; gap:7px; }
+    .row {
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+      min-height:42px;
+      padding:10px 11px;
+      border-radius:13px;
+      background:var(--row);
+    }
+    .row.input {
+      outline:1.5px solid rgba(0,0,0,.12);
+      outline-offset:-1px;
+    }
+    .circle {
+      width:19px;
+      height:19px;
+      flex:0 0 19px;
+      margin-top:1px;
+      border:1.7px solid #85888d;
+      border-radius:50%;
+    }
+    .placeholder { color:var(--tertiary); }
+    .hint { margin:8px 2px 0 30px; color:var(--tertiary); font-size:11px; }
+    .measure {
+      max-width:880px;
+      margin:28px auto 0;
+      padding:18px 20px;
+      border-radius:16px;
+      background:rgba(255,255,255,.62);
+      color:var(--secondary);
+      line-height:1.65;
+    }
+    code { color:#222; }
+    @media (max-width:840px) {
+      body { padding:24px 14px; }
+      .states { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MonoList · 内联输入设计基准</h1>
+    <p>输入行就是清单的一部分。未按 Enter 时只保留内存草稿，不创建正式任务。</p>
+  </header>
+
+  <main class="states">
+    <section>
+      <p class="label">空列表 · 最小高度</p>
+      <div class="panel empty">
+        <div class="topbar"><strong>今天</strong><span class="date">7 月 5 日</span></div>
+        <div class="row input">
+          <span class="circle"></span>
+          <span class="placeholder">输入待办，按 Enter 保存</span>
+        </div>
+        <div class="hint">关闭后保留本次运行期间的草稿</div>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">保存后 · 随任务数量展开</p>
+      <div class="panel filled">
+        <div class="topbar"><strong>今天</strong><span class="date">7 月 5 日</span></div>
+        <div class="rows">
+          <div class="row"><span class="circle"></span><span>完成产品介绍</span></div>
+          <div class="row"><span class="circle"></span><span>整理发布素材</span></div>
+          <div class="row"><span class="circle"></span><span>回复合作伙伴</span></div>
+          <div class="row input"><span class="circle"></span><span class="placeholder">输入下一条待办…</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="measure">
+    <b>实现约束：</b>
+    固定宽度 <code>360 pt</code>；空列表参考高度 <code>148 pt</code>；
+    高度随任务行数增长；达到最大高度后只滚动列表。
+    展开和收起使用约 <code>220–280 ms</code> 的平滑缓动。
+  </div>
+</body>
+</html>
