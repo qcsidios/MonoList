@@ -26,6 +26,7 @@ struct TaskStoreSmoke {
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
         try testUnknownSchemaDoesNotOverwriteFile()
+        try testDamagedFileDoesNotGetOverwritten()
         print("Task store smoke passed.")
     }
 
@@ -142,6 +143,18 @@ struct TaskStoreSmoke {
         } catch is TaskStoreError {
             // 预期失败。
         }
+    }
+
+    @MainActor
+    private static func testDamagedFileDoesNotGetOverwritten() throws {
+        let fixture = try Fixture()
+        let original = Data("不是有效的 JSON".utf8)
+        try original.write(to: fixture.fileURL)
+
+        let store = TaskStore(fileURL: fixture.fileURL)
+        try require(store.loadError != nil, "损坏文件没有进入恢复状态")
+        try require(try Data(contentsOf: fixture.fileURL) == original,
+                    "损坏文件被覆盖")
     }
 
     private static func require(_ condition: @autoclosure () throws -> Bool,
