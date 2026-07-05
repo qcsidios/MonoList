@@ -1,0 +1,249 @@
+import Foundation
+
+enum TaskStoreError: LocalizedError {
+    case emptyText
+    case invalidSchemaVersion
+    case missingTask
+    case recoveryRequired
+    case writePaused
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyText:
+            return "待办内容不能为空"
+        case .invalidSchemaVersion:
+            return "任务数据版本无法读取"
+        case .missingTask:
+            return "找不到这条待办"
+        case .recoveryRequired:
+            return "任务数据读取失败，请重试"
+        case .writePaused:
+            return "保存已暂停，请重试"
+        }
+    }
+}
+
+@MainActor
+final class TaskStore {
+    private(set) var tasks: [TaskItem] = []
+    private(set) var loadError: Error?
+    private(set) var isWritePaused = false
+
+    private let fileURL: URL
+    private let writer: any AtomicWriting
+
+    var pendingTasks: [TaskItem] {
+        tasks
+            .filter { $0.status == .pending }
+            .sorted {
+                if $0.order != $1.order {
+                    return $0.order < $1.order
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+    }
+
+    var historyTasks: [TaskItem] {
+        tasks
+            .filter { $0.status == .history }
+            .sorted {
+                let lhsDate = $0.completedAt ?? .distantPast
+                let rhsDate = $1.completedAt ?? .distantPast
+                if lhsDate != rhsDate {
+                    return lhsDate > rhsDate
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+    }
+
+    init(fileURL: URL, writer: any AtomicWriting = AtomicFileWriter()) {
+        self.fileURL = fileURL
+        self.writer = writer
+        load()
+    }
+
+    @discardableResult
+    func add(
+        text: String,
+        after previousID: UUID? = nil,
+        id: UUID = UUID(),
+        createdAt: Date = Date()
+    ) throws -> TaskItem {
+        let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedText.isEmpty else {
+            throw TaskStoreError.emptyText
+        }
+
+        var candidate = tasks
+        var pending = pendingTasks
+        let insertionIndex: Int
+        if let previousID,
+           let previousIndex = pending.firstIndex(where: { $0.id == previousID }) {
+            insertionIndex = pending.index(after: previousIndex)
+        } else {
+            insertionIndex = pending.endIndex
+        }
+
+        let item = TaskItem(
+            id: id,
+            text: normalizedText,
+            status: .pending,
+            order: insertionIndex,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            completedAt: nil
+        )
+        pending.insert(item, at: insertionIndex)
+        normalizeOrders(in: &pending)
+        candidate.removeAll { $0.status == .pending }
+        candidate.append(contentsOf: pending)
+        try commit(candidate)
+        return item
+    }
+
+    func complete(id: UUID, at date: Date = Date()) throws {
+        try mutateTask(id: id) { item in
+            item.status = .history
+            item.updatedAt = date
+            item.completedAt = date
+        }
+    }
+
+    func restore(id: UUID, at date: Date = Date()) throws {
+        let nextOrder = pendingTasks.count
+        try mutateTask(id: id) { item in
+            item.status = .pending
+            item.order = nextOrder
+            item.updatedAt = date
+            item.completedAt = nil
+        }
+    }
+
+    func delete(id: UUID) throws {
+        try guardAvailable()
+        var candidate = tasks
+        guard candidate.contains(where: { $0.id == id }) else {
+            throw TaskStoreError.missingTask
+        }
+        candidate.removeAll { $0.id == id }
+        normalizePendingOrders(in: &candidate)
+        try commit(candidate)
+    }
+
+    func clearPending() throws {
+        try clear { $0.status == .pending }
+    }
+
+    func clearHistory() throws {
+        try clear { $0.status == .history }
+    }
+
+    func clearAll() throws {
+        try clear { _ in true }
+    }
+
+    func retryPersist() throws {
+        guard loadError == nil else {
+            throw TaskStoreError.recoveryRequired
+        }
+        do {
+            try persist(tasks)
+            isWritePaused = false
+        } catch {
+            isWritePaused = true
+            throw error
+        }
+    }
+
+    private func load() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            return
+        }
+
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let database = try decoder.decode(TaskDatabase.self, from: data)
+            guard database.schemaVersion == TaskDatabase.currentSchemaVersion else {
+                throw TaskStoreError.invalidSchemaVersion
+            }
+            tasks = database.tasks
+            normalizePendingOrders(in: &tasks)
+        } catch {
+            loadError = error
+        }
+    }
+
+    private func mutateTask(
+        id: UUID,
+        mutation: (inout TaskItem) -> Void
+    ) throws {
+        try guardAvailable()
+        var candidate = tasks
+        guard let index = candidate.firstIndex(where: { $0.id == id }) else {
+            throw TaskStoreError.missingTask
+        }
+        mutation(&candidate[index])
+        normalizePendingOrders(in: &candidate)
+        try commit(candidate)
+    }
+
+    private func clear(where shouldDelete: (TaskItem) -> Bool) throws {
+        try guardAvailable()
+        var candidate = tasks
+        candidate.removeAll(where: shouldDelete)
+        normalizePendingOrders(in: &candidate)
+        try commit(candidate)
+    }
+
+    private func commit(_ candidate: [TaskItem]) throws {
+        try guardAvailable()
+        do {
+            try persist(candidate)
+            tasks = candidate
+        } catch {
+            isWritePaused = true
+            throw error
+        }
+    }
+
+    private func persist(_ candidate: [TaskItem]) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(TaskDatabase(tasks: candidate))
+        try writer.write(data, to: fileURL)
+    }
+
+    private func guardAvailable() throws {
+        if loadError != nil {
+            throw TaskStoreError.recoveryRequired
+        }
+        if isWritePaused {
+            throw TaskStoreError.writePaused
+        }
+    }
+
+    private func normalizePendingOrders(in candidate: inout [TaskItem]) {
+        var pending = candidate
+            .filter { $0.status == .pending }
+            .sorted {
+                if $0.order != $1.order {
+                    return $0.order < $1.order
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+        normalizeOrders(in: &pending)
+        let orders = Dictionary(uniqueKeysWithValues: pending.map { ($0.id, $0.order) })
+        for index in candidate.indices where candidate[index].status == .pending {
+            candidate[index].order = orders[candidate[index].id] ?? candidate[index].order
+        }
+    }
+
+    private func normalizeOrders(in pending: inout [TaskItem]) {
+        for index in pending.indices {
+            pending[index].order = index
+        }
+    }
+}
