@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MonoList 已完成任务设计基准</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --text-primary: #171717;
+      --text-secondary: #6f7175;
+      --text-tertiary: #9a9ca1;
+      --surface: rgba(255,255,255,.68);
+      --row: rgba(255,255,255,.72);
+      --line: rgba(0,0,0,.08);
+      --shadow: 0 18px 45px rgba(0,0,0,.14);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 40px;
+      color: var(--text-primary);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255,255,255,.95), transparent 35%),
+        linear-gradient(145deg,#e5e7ea,#cdd2d8);
+    }
+    header { max-width: 860px; margin: 0 auto 28px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    header p { margin: 0; color: var(--text-secondary); }
+    .comparison {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(340px, 1fr));
+      gap: 28px;
+      max-width: 860px;
+      margin: auto;
+    }
+    .state-title {
+      margin: 0 0 10px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .panel {
+      width: 360px;
+      min-height: 410px;
+      margin: auto;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px) saturate(1.25);
+    }
+    .topbar, .section-heading {
+      display: flex;
+      align-items: center;
+    }
+    .topbar { justify-content: space-between; margin-bottom: 14px; }
+    .topbar strong { font-size: 19px; }
+    .date { color: var(--text-secondary); font-size: 12px; }
+    .rows { display: grid; gap: 7px; }
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 11px;
+      border-radius: 12px;
+      background: var(--row);
+    }
+    .circle {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
+      margin-top: 1px;
+      border: 1.7px solid #85888d;
+      border-radius: 50%;
+    }
+    .section-heading { margin: 17px 2px 7px; }
+    .section-heading strong { color: var(--text-secondary); font-size: 13px; }
+    .count { margin-left: 6px; color: var(--text-tertiary); font-size: 12px; }
+    .toggle {
+      min-width: 48px;
+      min-height: 28px;
+      margin-left: auto;
+      padding: 5px 11px;
+      border: 0;
+      border-radius: 999px;
+      color: white;
+      background: #111;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .completed {
+      color: #85878c;
+      background: transparent;
+      text-decoration: line-through;
+    }
+    .completed .circle {
+      position: relative;
+      border-color: #666;
+      background: #111;
+    }
+    .completed .circle::after {
+      content: "✓";
+      position: absolute;
+      inset: -2px 0 0;
+      color: white;
+      text-align: center;
+      font-size: 12px;
+      text-decoration: none;
+    }
+    .day {
+      margin: 13px 10px 4px;
+      color: var(--text-tertiary);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .note {
+      max-width: 860px;
+      margin: 26px auto 0;
+      padding: 18px 20px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.62);
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+    @media (max-width: 820px) {
+      body { padding: 24px 14px; }
+      .comparison { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MonoList · 已完成任务设计基准</h1>
+    <p>左侧为默认清爽状态，右侧为用户主动展开全部历史后的状态。</p>
+  </header>
+
+  <main class="comparison">
+    <section>
+      <p class="state-title">默认状态 · 隐藏历史</p>
+      <div class="panel">
+        <div class="topbar"><strong>今天</strong><span class="date">7 月 5 日</span></div>
+        <div class="rows">
+          <div class="row"><span class="circle"></span><span>完成产品介绍</span></div>
+          <div class="row"><span class="circle"></span><span>整理发布素材</span></div>
+        </div>
+        <div class="section-heading">
+          <strong>已完成</strong><span class="count">今天 2</span><button class="toggle">显示</button>
+        </div>
+        <div class="rows">
+          <div class="row completed"><span class="circle"></span><span>回复邮件</span></div>
+          <div class="row completed"><span class="circle"></span><span>检查更新</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="state-title">展开状态 · 显示全部历史</p>
+      <div class="panel">
+        <div class="topbar"><strong>今天</strong><span class="date">7 月 5 日</span></div>
+        <div class="section-heading">
+          <strong>已完成</strong><span class="count">全部 18</span><button class="toggle">隐藏</button>
+        </div>
+        <div class="day">今天</div>
+        <div class="rows">
+          <div class="row completed"><span class="circle"></span><span>回复邮件</span></div>
+          <div class="row completed"><span class="circle"></span><span>检查更新</span></div>
+        </div>
+        <div class="day">7 月 4 日</div>
+        <div class="rows">
+          <div class="row completed"><span class="circle"></span><span>整理会议记录</span></div>
+        </div>
+        <div class="day">7 月 2 日</div>
+        <div class="rows">
+          <div class="row completed"><span class="circle"></span><span>更新说明文档</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="note">
+    今天完成的任务在“显示”和“隐藏”两种状态下都保持可见；按钮只控制更早日期的历史完成记录。
+    昨天以前尚未完成的任务继续留在今天顶部，不显示“逾期”标签。
+  </div>
+</body>
+</html>
