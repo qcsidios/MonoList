@@ -3,7 +3,7 @@
 > 状态：持续补充  
 > 首次确认日期：2026-07-05  
 > 当前确认范围：今天视图、新增草稿、已完成任务与历史记录的展示逻辑
-> 对应代码稿：`docs/design/completed-tasks-reference.html`、`docs/design/task-input-reference.html`
+> 对应代码稿：`docs/design/completed-tasks-reference.html`、`docs/design/task-input-reference.html`、`docs/design/logo-final-reference.html`
 
 ## 1. 文档用途
 
@@ -138,3 +138,17 @@
 ## 11. 后续补充方式
 
 Logo、设置窗口、空列表输入状态、任务编辑状态和动态展开效果确认后，继续在本目录增加对应 HTML 代码稿，并在本文件追加章节。所有已确认代码稿进入 Git 版本管理。
+
+## 12. Logo 设计基准
+
+Logo 采用已经确认的两行清单图形：
+
+- 黑色连续圆角方形作为底板。
+- 图形只使用纯白色，不使用灰色、渐变或彩色点缀。
+- 第一行由空心圆和横线组成，表示尚未完成。
+- 第二行由带勾空心圆和横线组成，表示已经完成。
+- 不增加第三行，保持缩小后的识别度和简洁感。
+- 两行垂直等距，圆圈描边、横线和勾线保持一致的视觉粗细。
+- 设置页同时展示英文名和中文名，写作 `MonoList 一栏`。
+
+最终矢量源文件为 `docs/design/assets/monolist-logo-mark.svg`，完整展示与设置页应用示例见 `docs/design/logo-final-reference.html`。正式 AppIcon、设置页 Logo 和其他尺寸资源必须从该矢量源文件生成，不得重新绘制造成偏差。
