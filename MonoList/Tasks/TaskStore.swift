@@ -109,6 +109,42 @@ final class TaskStore {
         }
     }
 
+    func updateText(id: UUID, text: String, at date: Date = Date()) throws {
+        let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedText.isEmpty else {
+            throw TaskStoreError.emptyText
+        }
+        try mutateTask(id: id) { item in
+            item.text = normalizedText
+            item.updatedAt = date
+        }
+    }
+
+    func move(id: UUID, by offset: Int) throws {
+        try guardAvailable()
+        guard offset != 0 else {
+            return
+        }
+
+        var pending = pendingTasks
+        guard let sourceIndex = pending.firstIndex(where: { $0.id == id }) else {
+            throw TaskStoreError.missingTask
+        }
+        let destinationIndex = min(max(sourceIndex + offset, pending.startIndex),
+                                   pending.index(before: pending.endIndex))
+        guard sourceIndex != destinationIndex else {
+            return
+        }
+
+        let item = pending.remove(at: sourceIndex)
+        pending.insert(item, at: destinationIndex)
+        normalizeOrders(in: &pending)
+
+        var candidate = tasks.filter { $0.status != .pending }
+        candidate.append(contentsOf: pending)
+        try commit(candidate)
+    }
+
     func restore(id: UUID, at date: Date = Date()) throws {
         let nextOrder = pendingTasks.count
         try mutateTask(id: id) { item in

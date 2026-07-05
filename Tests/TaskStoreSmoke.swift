@@ -22,6 +22,7 @@ struct TaskStoreSmoke {
     @MainActor
     static func main() throws {
         try testAddCompleteRestoreAndReload()
+        try testEditAndMovePersist()
         try testStableHistoryOrder()
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
@@ -55,6 +56,23 @@ struct TaskStoreSmoke {
         let reloaded = TaskStore(fileURL: fixture.fileURL)
         try require(reloaded.pendingTasks.map(\.id) == [first.id, third.id, second.id],
                     "重启后任务顺序没有保持")
+    }
+
+    @MainActor
+    private static func testEditAndMovePersist() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let first = try store.add(text: "第一条")
+        let second = try store.add(text: "第二条")
+        try store.updateText(id: first.id, text: "修改后", at: Date(timeIntervalSince1970: 50))
+        try store.move(id: second.id, by: -1)
+
+        try require(store.pendingTasks.map(\.text) == ["第二条", "修改后"],
+                    "编辑或排序结果不正确")
+
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(reloaded.pendingTasks.map(\.text) == ["第二条", "修改后"],
+                    "编辑或排序没有持久化")
     }
 
     @MainActor
