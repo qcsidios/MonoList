@@ -13,7 +13,6 @@
       --window: #f1f1f3;
       --card: rgba(255,255,255,.82);
       --blue: #0a84ff;
-      --red: #d93025;
     }
     * { box-sizing: border-box; }
     body {
@@ -95,10 +94,8 @@
     .traffic i:nth-child(3) { background: #28c840; }
     .scroll {
       height: 522px;
-      overflow-y: auto;
+      overflow: hidden;
       padding: 20px 21px 24px;
-      scrollbar-color: rgba(60,60,67,.30) transparent;
-      scrollbar-width: thin;
     }
     .stack {
       display: grid;
@@ -134,13 +131,17 @@
       min-height: 26px;
       border: 1px solid rgba(0,0,0,.13);
       border-radius: 7px;
-      background: linear-gradient(#fff, #ededee);
+      background: rgba(118,118,128,.09);
       color: #29292c;
       font: inherit;
       font-size: 12px;
-      box-shadow: 0 1px 1px rgba(0,0,0,.05);
     }
     button { padding: 3px 10px; }
+    button:active {
+      border-color: var(--blue);
+      color: white;
+      background: var(--blue);
+    }
     .update { min-width: 86px; }
     .card {
       padding: 15px 16px;
@@ -196,8 +197,9 @@
       box-shadow: 0 1px 3px rgba(0,0,0,.25);
     }
     .select {
-      min-width: 100px;
+      min-width: 112px;
       padding: 4px 24px 4px 9px;
+      background: #fff;
       text-align: right;
     }
     .keycap {
@@ -207,12 +209,6 @@
       font-size: 11px;
       font-weight: 600;
     }
-    .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .danger { color: var(--red); }
     .note {
       margin: 0 2px;
       color: var(--muted);
@@ -247,10 +243,7 @@
       .window {
         width: 100%;
         max-width: 480px;
-        height: min(560px, calc(100vh - 170px));
-        min-height: 480px;
       }
-      .scroll { height: calc(100% - 38px); }
       .specs { width: 100%; grid-template-columns: repeat(2, 1fr); }
       .name { font-size: 22px; }
     }
@@ -261,12 +254,12 @@
     <div class="page">
       <p class="eyebrow">MonoList · Settings Window</p>
       <h1>小尺寸，清楚分区。</h1>
-      <p class="intro">沿用 ShortLens 控制台的紧凑比例与卡片结构。窗口本身保持固定尺寸，内容超过可用高度时只在窗口内部滚动。</p>
+      <p class="intro">沿用 ShortLens 控制台的紧凑比例、灰度控件和卡片结构。删去不属于设置的操作后，固定窗口可以完整显示全部内容，无需滚动。</p>
 
       <section class="window" aria-label="MonoList 设置窗口">
         <div class="titlebar">
           <span class="traffic"><i></i><i></i><i></i></span>
-          MonoList 一栏 · 设置
+          MonoList 控制台
         </div>
         <div class="scroll">
           <div class="stack">
@@ -298,7 +291,7 @@
               <div class="row">
                 <div class="copy"><p class="label">提醒位置</p></div>
                 <span class="spacer"></span>
-                <span class="select">屏幕右上角⌄</span>
+                <span class="select">屏幕中间⌄</span>
               </div>
             </section>
 
@@ -323,28 +316,9 @@
                 <span class="keycap">未设置</span>
                 <button>录入</button>
               </div>
-              <div class="row">
-                <div class="copy"><p class="label">列表排序</p></div>
-                <span class="spacer"></span>
-                <span class="keycap">⌘ ↑</span>
-                <span class="keycap">⌘ ↓</span>
-              </div>
             </section>
 
-            <section class="card">
-              <div class="row">
-                <div class="copy">
-                  <p class="label">数据管理</p>
-                  <p class="hint">清空操作会在执行前进行二次确认</p>
-                </div>
-              </div>
-              <div class="actions">
-                <button>清空主列表</button>
-                <button class="danger">清空全部任务数据</button>
-              </div>
-            </section>
-
-            <p class="note">设置和任务数据保存在本机，软件升级不会清除。</p>
+            <p class="note">任务可在主列表中拖动排序；批量删除和清空操作位于任务功能区。设置和任务数据在升级后继续保留。</p>
           </div>
         </div>
       </section>
@@ -353,7 +327,7 @@
         <div class="spec"><strong>480 × 560</strong><span>窗口尺寸</span></div>
         <div class="spec"><strong>52 pt</strong><span>顶部 Logo</span></div>
         <div class="spec"><strong>12 pt</strong><span>卡片间距</span></div>
-        <div class="spec"><strong>内部滚动</strong><span>溢出处理</span></div>
+        <div class="spec"><strong>无需滚动</strong><span>精简布局</span></div>
       </div>
     </div>
   </main>
