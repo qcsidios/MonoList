@@ -115,7 +115,7 @@
       border: 3px solid #151515;
       border-radius: 50%;
     }
-    .dot.checked { position: relative; border-color: #151515; background: #151515; }
+    .dot.checked { position: relative; }
     .dot.checked::after {
       content: "";
       position: absolute;
@@ -123,8 +123,8 @@
       height: 4px;
       top: 4px;
       left: 4px;
-      border-left: 2.5px solid #fff;
-      border-bottom: 2.5px solid #fff;
+      border-left: 2.5px solid #151515;
+      border-bottom: 2.5px solid #151515;
       transform: rotate(-45deg);
     }
     .sizes {
@@ -214,8 +214,8 @@
 <body>
   <main>
     <p class="eyebrow">MonoList · Final Logo Reference</p>
-    <h1>沿用现有清单符号。</h1>
-    <p class="intro">沿用 0.1.0 设置页代码中的系统 <code>checklist</code> 风格，调整为“空心圆在上、勾选圆在下”。这一稿继续扩大白色图形，并统一两个圆形的外径。</p>
+    <h1>双态清单，正式定稿。</h1>
+    <p class="intro">最终选用重新设计方案 A：保留 0.1.0 设置页清单符号的简洁感，用两个完全相同的空心圆表达待办状态，并只在第二个圆内加入对勾。</p>
 
     <section class="hero">
       <div class="card mark-stage">
@@ -223,9 +223,9 @@
       </div>
 
       <article class="card detail">
-        <span class="status">已确认方向</span>
-        <h2>两行清单</h2>
-        <p>两个圆形的最外径完全相同。空心圆描边与横线同为 10 个矢量单位；内部对勾缩细为 8 个单位，并完整收在实心圆内，不接触圆形边缘。</p>
+        <span class="status">已选方案 A</span>
+        <h2>双态清单</h2>
+        <p>两个圆形的尺寸、填充和描边完全一致。对勾只作为第二行的内部状态，不使用实心圆，因此整体更轻、更干净。</p>
         <div class="rule"><span class="dot"></span><span>第一行：空心圆 + 横线</span></div>
         <div class="rule"><span class="dot checked"></span><span>第二行：勾选圆 + 横线</span></div>
 
@@ -252,7 +252,7 @@
       </div>
     </section>
 
-    <footer><strong>设置页实现基准：</strong>64 × 64 pt 黑色圆角底板；两个圆形外径一致，圆圈描边与横线等粗，勾线更细且不接触圆边；版本号与“检测新版本”始终位于同一横排。</footer>
+    <footer><strong>设置页实现基准：</strong>64 × 64 pt 黑色圆角底板；两个圆完全同形，第二行仅增加较细的内部对勾；版本号与“检测新版本”始终位于同一横排。</footer>
   </main>
 </body>
 </html>
