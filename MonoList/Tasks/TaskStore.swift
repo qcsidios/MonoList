@@ -1,9 +1,11 @@
+import Combine
 import Foundation
 
 enum TaskStoreError: LocalizedError {
     case emptyText
     case invalidSchemaVersion
     case missingTask
+    case invalidOrder
     case recoveryRequired
     case writePaused
 
@@ -15,6 +17,8 @@ enum TaskStoreError: LocalizedError {
             return "任务数据版本无法读取"
         case .missingTask:
             return "找不到这条待办"
+        case .invalidOrder:
+            return "待办排序数据无效"
         case .recoveryRequired:
             return "任务数据读取失败，请重试"
         case .writePaused:
@@ -24,10 +28,10 @@ enum TaskStoreError: LocalizedError {
 }
 
 @MainActor
-final class TaskStore {
-    private(set) var tasks: [TaskItem] = []
-    private(set) var loadError: Error?
-    private(set) var isWritePaused = false
+final class TaskStore: ObservableObject {
+    @Published private(set) var tasks: [TaskItem] = []
+    @Published private(set) var loadError: Error?
+    @Published private(set) var isWritePaused = false
 
     private let fileURL: URL
     private let writer: any AtomicWriting
@@ -109,6 +113,18 @@ final class TaskStore {
         }
     }
 
+    func complete(id: UUID, finalText: String, at date: Date = Date()) throws {
+        let normalizedText = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        try mutateTask(id: id) { item in
+            if !normalizedText.isEmpty {
+                item.text = normalizedText
+            }
+            item.status = .history
+            item.updatedAt = date
+            item.completedAt = date
+        }
+    }
+
     func updateText(id: UUID, text: String, at date: Date = Date()) throws {
         let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedText.isEmpty else {
@@ -142,6 +158,26 @@ final class TaskStore {
 
         var candidate = tasks.filter { $0.status != .pending }
         candidate.append(contentsOf: pending)
+        try commit(candidate)
+    }
+
+    func reorder(ids: [UUID]) throws {
+        try guardAvailable()
+        let pending = pendingTasks
+        guard ids.count == pending.count,
+              Set(ids) == Set(pending.map(\.id)) else {
+            throw TaskStoreError.invalidOrder
+        }
+        let itemsByID = Dictionary(uniqueKeysWithValues: pending.map { ($0.id, $0) })
+        var reordered = try ids.map { id -> TaskItem in
+            guard let item = itemsByID[id] else {
+                throw TaskStoreError.invalidOrder
+            }
+            return item
+        }
+        normalizeOrders(in: &reordered)
+        var candidate = tasks.filter { $0.status != .pending }
+        candidate.append(contentsOf: reordered)
         try commit(candidate)
     }
 
@@ -189,6 +225,13 @@ final class TaskStore {
             isWritePaused = true
             throw error
         }
+    }
+
+    func retryLoad() {
+        tasks = []
+        loadError = nil
+        isWritePaused = false
+        load()
     }
 
     private func load() {

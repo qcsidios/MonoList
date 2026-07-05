@@ -1,0 +1,44 @@
+import Foundation
+
+@main
+struct ReminderSchedulerSmoke {
+    @MainActor
+    static func main() {
+        var now: TimeInterval = 100
+        var triggerCount = 0
+        let scheduler = ReminderScheduler(
+            now: { now },
+            onDue: { triggerCount += 1 }
+        )
+
+        scheduler.configure(enabled: true, intervalMinutes: 60, pendingCount: 1)
+        precondition(scheduler.deadline == 3_700)
+
+        scheduler.pendingCountChanged(from: 1, to: 2)
+        precondition(scheduler.deadline == 3_700)
+
+        now = 3_700
+        scheduler.evaluate(interfaceBusy: true)
+        precondition(triggerCount == 0)
+        precondition(scheduler.deadline == 7_300)
+
+        now = 7_300
+        scheduler.evaluate(interfaceBusy: false)
+        precondition(triggerCount == 1)
+        precondition(scheduler.deadline == nil)
+
+        scheduler.reminderClosed(pendingCount: 2)
+        precondition(scheduler.deadline == 10_900)
+
+        scheduler.pendingCountChanged(from: 2, to: 0)
+        precondition(scheduler.deadline == nil)
+
+        now = 8_000
+        scheduler.pendingCountChanged(from: 0, to: 1)
+        precondition(scheduler.deadline == 11_600)
+        scheduler.wake(pendingCount: 1)
+        precondition(scheduler.deadline == 11_600)
+
+        print("Reminder scheduler smoke passed.")
+    }
+}

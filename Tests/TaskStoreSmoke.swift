@@ -23,6 +23,8 @@ struct TaskStoreSmoke {
     static func main() throws {
         try testAddCompleteRestoreAndReload()
         try testEditAndMovePersist()
+        try testCompleteCommitsPendingTextAtomically()
+        try testExplicitReorderPersists()
         try testStableHistoryOrder()
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
@@ -73,6 +75,35 @@ struct TaskStoreSmoke {
         let reloaded = TaskStore(fileURL: fixture.fileURL)
         try require(reloaded.pendingTasks.map(\.text) == ["第二条", "修改后"],
                     "编辑或排序没有持久化")
+    }
+
+    @MainActor
+    private static func testCompleteCommitsPendingTextAtomically() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let item = try store.add(text: "旧内容")
+        try store.complete(id: item.id, finalText: "最终内容",
+                           at: Date(timeIntervalSince1970: 75))
+
+        try require(store.pendingTasks.isEmpty, "原子完成后任务仍在主列表")
+        try require(store.historyTasks.map(\.text) == ["最终内容"],
+                    "完成时没有一起保存最终文本")
+    }
+
+    @MainActor
+    private static func testExplicitReorderPersists() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let first = try store.add(text: "一")
+        let second = try store.add(text: "二")
+        let third = try store.add(text: "三")
+        try store.reorder(ids: [third.id, first.id, second.id])
+
+        try require(store.pendingTasks.map(\.id) == [third.id, first.id, second.id],
+                    "拖动排序结果不正确")
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(reloaded.pendingTasks.map(\.id) == [third.id, first.id, second.id],
+                    "拖动排序没有持久化")
     }
 
     @MainActor
@@ -161,6 +192,19 @@ struct TaskStoreSmoke {
         } catch is TaskStoreError {
             // 预期失败。
         }
+
+        let validStore = TaskStore(
+            fileURL: fixture.directoryURL.appendingPathComponent("valid.json")
+        )
+        _ = try validStore.add(text: "恢复后的数据")
+        let validData = try Data(
+            contentsOf: fixture.directoryURL.appendingPathComponent("valid.json")
+        )
+        try validData.write(to: fixture.fileURL)
+        store.retryLoad()
+        try require(store.loadError == nil, "修复文件后重试读取没有恢复")
+        try require(store.pendingTasks.map(\.text) == ["恢复后的数据"],
+                    "重试读取没有加载修复后的数据")
     }
 
     @MainActor
