@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MonoList 任务操作区设计稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --text: #18181a;
+      --secondary: #74767b;
+      --tertiary: #999ba0;
+      --surface: rgba(255,255,255,.72);
+      --row: rgba(255,255,255,.78);
+      --line: rgba(0,0,0,.08);
+      --danger: #d92d20;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 40px 18px 54px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(255,255,255,.96), transparent 34%),
+        linear-gradient(145deg,#e7e9ec,#ccd1d7);
+    }
+    header {
+      max-width: 850px;
+      margin: 0 auto 28px;
+    }
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: -.035em; }
+    header p { margin: 0; color: var(--secondary); font-size: 13px; line-height: 1.6; }
+    .states {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(360px, 1fr));
+      gap: 28px;
+      max-width: 850px;
+      margin: auto;
+      align-items: start;
+    }
+    .state-title {
+      margin: 0 0 9px;
+      color: var(--secondary);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .panel {
+      position: relative;
+      width: 360px;
+      min-height: 390px;
+      margin: auto;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: 0 18px 45px rgba(0,0,0,.15);
+      backdrop-filter: blur(24px) saturate(1.2);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      min-height: 38px;
+      margin-bottom: 11px;
+    }
+    .title-block {
+      display: grid;
+      gap: 1px;
+    }
+    .title-block strong { font-size: 19px; letter-spacing: -.02em; }
+    .title-block span { color: var(--secondary); font-size: 11px; }
+    .tools {
+      display: flex;
+      gap: 5px;
+      margin-left: auto;
+    }
+    .tool {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      place-items: center;
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 10px;
+      color: #343438;
+      background: rgba(255,255,255,.60);
+      font: inherit;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .tool.active { color: white; background: #171719; }
+    .gear {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .rows { display: grid; gap: 7px; }
+    .row {
+      display: flex;
+      min-height: 43px;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 11px;
+      border-radius: 13px;
+      background: var(--row);
+    }
+    .row.dragging {
+      position: relative;
+      z-index: 2;
+      transform: translateY(2px) rotate(-.35deg);
+      box-shadow: 0 10px 20px rgba(0,0,0,.16);
+    }
+    .circle {
+      width: 19px;
+      height: 19px;
+      flex: 0 0 19px;
+      margin-top: 1px;
+      border: 1.7px solid #85888d;
+      border-radius: 50%;
+    }
+    .section-heading {
+      display: flex;
+      align-items: center;
+      margin: 16px 2px 7px;
+    }
+    .section-heading strong { color: var(--secondary); font-size: 13px; }
+    .section-heading span { margin-left: 6px; color: var(--tertiary); font-size: 11px; }
+    .show {
+      min-width: 48px;
+      min-height: 28px;
+      margin-left: auto;
+      border: 0;
+      border-radius: 999px;
+      color: white;
+      background: #171719;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .completed {
+      color: #85878c;
+      background: transparent;
+      text-decoration: line-through;
+    }
+    .completed .circle {
+      position: relative;
+      border-color: #111;
+      background: #111;
+    }
+    .completed .circle::after {
+      content: "✓";
+      position: absolute;
+      inset: -2px 0 0;
+      color: white;
+      font-size: 12px;
+      text-align: center;
+      text-decoration: none;
+    }
+    .menu {
+      position: absolute;
+      z-index: 5;
+      top: 55px;
+      right: 51px;
+      width: 188px;
+      padding: 6px;
+      border: 1px solid rgba(0,0,0,.13);
+      border-radius: 12px;
+      background: rgba(249,249,249,.96);
+      box-shadow: 0 14px 32px rgba(0,0,0,.22);
+      backdrop-filter: blur(28px);
+    }
+    .menu button {
+      display: block;
+      width: 100%;
+      min-height: 34px;
+      padding: 7px 9px;
+      border: 0;
+      border-radius: 7px;
+      color: #27272a;
+      background: transparent;
+      font: inherit;
+      font-size: 12px;
+      text-align: left;
+    }
+    .menu button:hover { background: rgba(0,0,0,.06); }
+    .menu .divider { height: 1px; margin: 5px 7px; background: rgba(0,0,0,.09); }
+    .menu button.danger { color: var(--danger); }
+    .rules {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      max-width: 850px;
+      margin: 24px auto 0;
+    }
+    .rule {
+      padding: 13px 14px;
+      border: 1px solid rgba(0,0,0,.07);
+      border-radius: 13px;
+      background: rgba(255,255,255,.60);
+      color: var(--secondary);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    .rule strong { display: block; margin-bottom: 3px; color: var(--text); font-size: 12px; }
+    @media (max-width: 810px) {
+      body { padding: 26px 14px 46px; }
+      .states { grid-template-columns: 1fr; }
+      .rules { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">MonoList · Task Actions</p>
+    <h1>高频操作露出，低频操作收起。</h1>
+    <p>新增和完成直接发生在列表中；设置与批量清空保留在顶部。三个清空命令统一放进省略号菜单，避免主界面出现一排危险按钮。</p>
+  </header>
+
+  <main class="states">
+    <section>
+      <p class="state-title">默认状态 · 顶部保持安静</p>
+      <div class="panel">
+        <div class="topbar">
+          <div class="title-block"><strong>今天</strong><span>7 月 6 日</span></div>
+          <div class="tools">
+            <button class="tool" aria-label="更多操作">•••</button>
+            <button class="tool gear" aria-label="打开控制台">⚙</button>
+          </div>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="circle"></span><span>完成产品介绍</span></div>
+          <div class="row dragging"><span class="circle"></span><span>整理发布素材</span></div>
+          <div class="row"><span class="circle"></span><span>回复合作伙伴</span></div>
+        </div>
+        <div class="section-heading">
+          <strong>已完成</strong><span>今天 1</span><button class="show">显示</button>
+        </div>
+        <div class="rows">
+          <div class="row completed"><span class="circle"></span><span>检查更新</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="state-title">更多操作 · 只收纳批量动作</p>
+      <div class="panel">
+        <div class="topbar">
+          <div class="title-block"><strong>今天</strong><span>7 月 6 日</span></div>
+          <div class="tools">
+            <button class="tool active" aria-label="更多操作">•••</button>
+            <button class="tool gear" aria-label="打开控制台">⚙</button>
+          </div>
+        </div>
+        <div class="menu">
+          <button>清空未完成任务…</button>
+          <button>清空已完成任务…</button>
+          <div class="divider"></div>
+          <button class="danger">清空全部任务…</button>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="circle"></span><span>完成产品介绍</span></div>
+          <div class="row"><span class="circle"></span><span>整理发布素材</span></div>
+          <div class="row"><span class="circle"></span><span>回复合作伙伴</span></div>
+        </div>
+        <div class="section-heading">
+          <strong>已完成</strong><span>今天 1</span><button class="show">显示</button>
+        </div>
+        <div class="rows">
+          <div class="row completed"><span class="circle"></span><span>检查更新</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="rules">
+    <div class="rule"><strong>拖动排序</strong>整行都可拖动，不常驻显示拖动把手；拖动时行浮起并产生阴影。</div>
+    <div class="rule"><strong>删除规则</strong>单条删除立即执行；三个清空命令全部进入二次确认。</div>
+    <div class="rule"><strong>草稿安全</strong>未按 Enter 的草稿不属于正式任务，执行清空时不会被统计或删除。</div>
+  </section>
+</body>
+</html>
