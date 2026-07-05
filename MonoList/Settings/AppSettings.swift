@@ -16,6 +16,7 @@ enum AppSettingsError: LocalizedError {
 }
 
 enum ReminderPosition: String, Codable, CaseIterable, Identifiable {
+    case center
     case topCenter
     case belowMenuBar
     case topRight
@@ -24,6 +25,8 @@ enum ReminderPosition: String, Codable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .center:
+            return "屏幕中间"
         case .topCenter:
             return "顶部居中"
         case .belowMenuBar:
@@ -42,8 +45,8 @@ struct ShortcutDefinition: Codable, Equatable {
 struct SettingsValues: Codable, Equatable {
     var reminderEnabled = true
     var reminderIntervalMinutes = 60
-    var reminderPosition = ReminderPosition.topCenter
-    var launchAtLogin = false
+    var reminderPosition = ReminderPosition.center
+    var launchAtLogin = true
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
 }

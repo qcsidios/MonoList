@@ -32,8 +32,16 @@ struct AppLaunchSmoke {
                     "Bundle ID 不正确")
         try require(plist["CFBundleExecutable"] as? String == "MonoList",
                     "可执行文件名称不正确")
-        try require(plist["LSUIElement"] as? Bool == true,
-                    "LSUIElement 必须为 true")
+        try require(plist["CFBundleIconFile"] as? String == "AppIcon.icns",
+                    "应用图标配置不正确")
+        try require(
+            FileManager.default.fileExists(
+                atPath: contentsURL.appendingPathComponent("Resources/AppIcon.icns").path
+            ),
+            "构建产物缺少 AppIcon.icns"
+        )
+        try require(plist["LSUIElement"] as? Bool != true,
+                    "应用必须显示在 Dock，LSUIElement 不能为 true")
         try require(plist["LSMinimumSystemVersion"] as? String == "14.0",
                     "最低系统版本必须为 macOS 14.0")
 

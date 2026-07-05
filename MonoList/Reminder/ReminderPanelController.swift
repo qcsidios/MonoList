@@ -121,6 +121,11 @@ final class ReminderPanelController {
         let margin: CGFloat = 12
         let origin: NSPoint
         switch position {
+        case .center:
+            origin = NSPoint(
+                x: visibleFrame.midX - size.width / 2,
+                y: visibleFrame.midY - size.height / 2
+            )
         case .topCenter:
             origin = NSPoint(
                 x: visibleFrame.midX - size.width / 2,

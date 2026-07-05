@@ -26,6 +26,7 @@ struct TaskStoreSmoke {
         try testCompleteCommitsPendingTextAtomically()
         try testExplicitReorderPersists()
         try testStableHistoryOrder()
+        try testTodayAndOlderCompletedTasks()
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
         try testUnknownSchemaDoesNotOverwriteFile()
@@ -126,6 +127,31 @@ struct TaskStoreSmoke {
 
         try require(store.historyTasks.map(\.id) == [ids[1], ids[0]],
                     "相同完成时间没有按稳定任务 ID 升序排列")
+    }
+
+    @MainActor
+    private static func testTodayAndOlderCompletedTasks() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        let today = calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 6, hour: 12)
+        )!
+        let todayTask = try store.add(text: "今天完成")
+        let olderTask = try store.add(text: "昨天完成")
+
+        try store.complete(id: todayTask.id, at: today.addingTimeInterval(60))
+        try store.complete(id: olderTask.id, at: today.addingTimeInterval(-24 * 60 * 60))
+
+        try require(
+            store.completedTasks(on: today, calendar: calendar).map(\.id) == [todayTask.id],
+            "今天完成任务筛选不正确"
+        )
+        try require(
+            store.completedTasks(before: today, calendar: calendar).map(\.id) == [olderTask.id],
+            "较早完成任务筛选不正确"
+        )
     }
 
     @MainActor

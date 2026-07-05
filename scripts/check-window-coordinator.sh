@@ -13,6 +13,7 @@ swiftc \
   "$ROOT_DIR/MonoList/Tasks/TaskItem.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskStore.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskListView.swift" \
+  "$ROOT_DIR/MonoList/Tasks/TaskDraftState.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskRowView.swift" \
   "$ROOT_DIR/MonoList/Tasks/HistoryView.swift" \
   "$ROOT_DIR/MonoList/Tasks/DataRecoveryView.swift" \
@@ -23,6 +24,7 @@ swiftc \
   "$ROOT_DIR/MonoList/Update/AppUpdater.swift" \
   "$ROOT_DIR/MonoList/Shared/AtomicFileWriter.swift" \
   "$ROOT_DIR/MonoList/Shared/AppError.swift" \
+  "$ROOT_DIR/MonoList/Shared/MonoListLogoView.swift" \
   "$ROOT_DIR/Tests/WindowCoordinatorSmoke.swift" \
   -o "$TEST_EXECUTABLE"
 

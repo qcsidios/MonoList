@@ -4,12 +4,15 @@ import SwiftUI
 @MainActor
 final class WindowCoordinator {
     static let mainPanelWidth: CGFloat = 360
+    static let mainPanelMinimumHeight: CGFloat = 148
     static let mainPanelMaximumHeight: CGFloat = 520
+    static let settingsWindowSize = NSSize(width: 480, height: 560)
 
     var onOpenSettings: (() -> Void)?
     var onWillShowMainPanel: (() -> Void)?
 
     private let taskStore: TaskStore
+    private let draftState = TaskDraftState()
     private var mainPanel: MainPanel?
     private var outsideClickMonitor: Any?
     private weak var previousApplication: NSRunningApplication?
@@ -30,6 +33,18 @@ final class WindowCoordinator {
 
     init(taskStore: TaskStore) {
         self.taskStore = taskStore
+    }
+
+    static func preferredMainPanelHeight(
+        pendingCount: Int,
+        todayCompletedCount: Int,
+        olderVisibleCount: Int
+    ) -> CGFloat {
+        var height: CGFloat = 122 + CGFloat(pendingCount) * 43
+        if todayCompletedCount + olderVisibleCount > 0 {
+            height += 32 + CGFloat(todayCompletedCount + olderVisibleCount) * 42
+        }
+        return min(max(height, mainPanelMinimumHeight), mainPanelMaximumHeight)
     }
 
     func configureSettings(
@@ -77,7 +92,7 @@ final class WindowCoordinator {
         )
         let originY = max(
             visibleFrame.minY + 8,
-            anchor.y - Self.mainPanelMaximumHeight - 6
+            anchor.y - panel.frame.height - 6
         )
         panel.setFrameOrigin(NSPoint(x: originX, y: originY))
 
@@ -114,12 +129,12 @@ final class WindowCoordinator {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 560),
+            contentRect: NSRect(origin: .zero, size: Self.settingsWindowSize),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "MonoList 一栏 · 设置"
+        window.title = "MonoList 控制台"
         window.center()
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(
@@ -127,7 +142,6 @@ final class WindowCoordinator {
                 settings: settings,
                 loginItemController: loginItemController,
                 shortcutController: shortcutController,
-                taskStore: taskStore,
                 updater: updater,
                 onInstallUpdate: onInstallUpdate ?? { _ in }
             )
@@ -138,12 +152,17 @@ final class WindowCoordinator {
     }
 
     private func makeMainPanel() -> MainPanel {
+        let initialHeight = Self.preferredMainPanelHeight(
+            pendingCount: taskStore.pendingTasks.count,
+            todayCompletedCount: taskStore.completedTasks(on: Date()).count,
+            olderVisibleCount: 0
+        )
         let panel = MainPanel(
             contentRect: NSRect(
                 x: 0,
                 y: 0,
                 width: Self.mainPanelWidth,
-                height: Self.mainPanelMaximumHeight
+                height: initialHeight
             ),
             styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
@@ -167,16 +186,33 @@ final class WindowCoordinator {
         panel.contentView = NSHostingView(
             rootView: TaskListView(
                 store: taskStore,
+                draftState: draftState,
                 onClose: { [weak self] in
                     self?.closeMainPanel(restoringFocus: true)
                 },
                 onOpenSettings: { [weak self] in
                     self?.closeMainPanel()
                     self?.onOpenSettings?()
+                },
+                onHeightChanged: { [weak self, weak panel] height in
+                    guard let self, let panel else { return }
+                    self.resizeMainPanel(panel, to: height)
                 }
             )
         )
         return panel
+    }
+
+    private func resizeMainPanel(_ panel: NSPanel, to height: CGFloat) {
+        let clampedHeight = min(
+            max(height, Self.mainPanelMinimumHeight),
+            Self.mainPanelMaximumHeight
+        )
+        guard abs(panel.frame.height - clampedHeight) > 0.5 else { return }
+        var frame = panel.frame
+        frame.origin.y += frame.height - clampedHeight
+        frame.size.height = clampedHeight
+        panel.setFrame(frame, display: true, animate: true)
     }
 
     private func rememberFrontmostApplication() {

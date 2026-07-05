@@ -11,8 +11,8 @@ struct AppSettingsSmoke {
 
         precondition(settings.reminderEnabled)
         precondition(settings.reminderIntervalMinutes == 60)
-        precondition(settings.reminderPosition == .topCenter)
-        precondition(!settings.launchAtLogin)
+        precondition(settings.reminderPosition == .center)
+        precondition(settings.launchAtLogin)
         precondition(settings.globalShortcut == nil)
 
         try settings.update {

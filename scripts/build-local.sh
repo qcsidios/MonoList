@@ -15,6 +15,8 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 EXECUTABLE="$MACOS_DIR/$APP_NAME"
 CODESIGN_IDENTITY="${MONOLIST_CODESIGN_IDENTITY:-}"
+ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
+GENERATED_ICON="$BUILD_DIR/AppIcon.icns"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
@@ -30,11 +32,11 @@ swiftc \
   "${SWIFT_SOURCES[@]}" \
   -o "$EXECUTABLE"
 
-ICON_PLIST=""
-if [[ -f "$ROOT_DIR/MonoList/Resources/AppIcon.icns" ]]; then
-  cp "$ROOT_DIR/MonoList/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
-  ICON_PLIST=$'    <key>CFBundleIconFile</key>\\n    <string>AppIcon.icns</string>'
-fi
+rm -rf "$ICONSET_DIR" "$GENERATED_ICON"
+swift "$ROOT_DIR/scripts/generate-app-icon.swift" "$ICONSET_DIR"
+iconutil -c icns "$ICONSET_DIR" -o "$GENERATED_ICON"
+cp "$GENERATED_ICON" "$RESOURCES_DIR/AppIcon.icns"
+ICON_PLIST=$'    <key>CFBundleIconFile</key>\n    <string>AppIcon.icns</string>'
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -63,7 +65,7 @@ $ICON_PLIST
     <key>LSMinimumSystemVersion</key>
     <string>$MIN_MACOS_VERSION</string>
     <key>LSUIElement</key>
-    <true/>
+    <false/>
 </dict>
 </plist>
 PLIST

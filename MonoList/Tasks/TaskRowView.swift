@@ -13,9 +13,8 @@ struct TaskRowView: View {
     let onEditingChanged: (Bool) -> Void
 
     @State private var text: String
+    @State private var originalText: String
     @State private var isHovered = false
-    @State private var pendingSave: DispatchWorkItem?
-    @State private var suppressDisappearSave = false
     @FocusState private var isEditing: Bool
 
     init(
@@ -41,89 +40,85 @@ struct TaskRowView: View {
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
         _text = State(initialValue: item.text)
+        _originalText = State(initialValue: item.text)
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 9) {
+        HStack(alignment: .top, spacing: 10) {
             Button {
-                pendingSave?.cancel()
-                suppressDisappearSave = true
                 onComplete(text)
             } label: {
                 Image(systemName: "circle")
-                    .font(.system(size: 16))
+                    .font(.system(size: 18, weight: .regular))
                     .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
             .help("标记为完成")
 
-            TextField("待办内容", text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...6)
-                .focused($isEditing)
-                .onChange(of: text) { _, newValue in
-                    scheduleSave(newValue)
+            Group {
+                if isEditing {
+                    TextField("待办内容", text: $text, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .lineLimit(1...6)
+                        .focused($isEditing)
+                        .onSubmit {
+                            saveIfNeeded()
+                            isEditing = false
+                            onInsertAfter()
+                        }
+                } else {
+                    Text(text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture(count: 2) {
+                            originalText = text
+                            isEditing = true
+                        }
                 }
-                .onSubmit {
-                    flushSave()
-                    onInsertAfter()
-                }
-
-            if isHovered {
-                Button {
-                    suppressDisappearSave = true
-                    pendingSave?.cancel()
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("删除")
             }
+            .padding(.vertical, 5)
+
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .opacity(isHovered || isSelected ? 1 : 0)
+            }
+            .buttonStyle(.plain)
+            .help("删除")
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
         .background(
-            isSelected && !isEditing ? Color.accentColor.opacity(0.12) : .clear,
-            in: RoundedRectangle(cornerRadius: 6)
+            isSelected && !isEditing ? Color.primary.opacity(0.06) : .clear,
+            in: RoundedRectangle(cornerRadius: 9)
         )
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded(onSelect))
         .onHover { isHovered = $0 }
-        .onChange(of: isEditing) { _, value in
-            onEditingChanged(value)
+        .onChange(of: isEditing) { oldValue, newValue in
+            if oldValue && !newValue {
+                saveIfNeeded()
+            }
+            onEditingChanged(newValue)
         }
         .contextMenu {
             Button("上移", action: onMoveUp)
             Button("下移", action: onMoveDown)
             Divider()
-            Button("删除", role: .destructive) {
-                suppressDisappearSave = true
-                pendingSave?.cancel()
-                onDelete()
-            }
-        }
-        .onDisappear {
-            if !suppressDisappearSave {
-                flushSave()
-            }
+            Button("删除", role: .destructive, action: onDelete)
         }
     }
 
-    private func scheduleSave(_ value: String) {
-        pendingSave?.cancel()
-        let workItem = DispatchWorkItem {
-            onSave(value)
-        }
-        pendingSave = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
-    }
-
-    private func flushSave() {
-        pendingSave?.cancel()
-        pendingSave = nil
+    private func saveIfNeeded() {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        onSave(normalized.isEmpty ? item.text : text)
+        if normalized.isEmpty {
+            text = originalText
+            return
+        }
+        guard text != originalText else { return }
+        onSave(text)
+        originalText = text
     }
 }

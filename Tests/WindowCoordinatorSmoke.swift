@@ -12,7 +12,31 @@ struct WindowCoordinatorSmoke {
         let coordinator = WindowCoordinator(taskStore: store)
 
         precondition(WindowCoordinator.mainPanelWidth == 360)
+        precondition(WindowCoordinator.mainPanelMinimumHeight == 148)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 520)
+        precondition(WindowCoordinator.settingsWindowSize == NSSize(width: 480, height: 560))
+        precondition(
+            WindowCoordinator.preferredMainPanelHeight(
+                pendingCount: 0,
+                todayCompletedCount: 0,
+                olderVisibleCount: 0
+            ) == 148
+        )
+        precondition(
+            WindowCoordinator.preferredMainPanelHeight(
+                pendingCount: 20,
+                todayCompletedCount: 10,
+                olderVisibleCount: 10
+            ) == 520
+        )
+
+        let draft = TaskDraftState()
+        draft.text = "还没有按回车"
+        precondition(draft.text == "还没有按回车")
+        precondition(store.pendingTasks.isEmpty)
+        try draft.submit(to: store)
+        precondition(store.pendingTasks.map(\.text) == ["还没有按回车"])
+        precondition(draft.text.isEmpty)
         coordinator.showMainPanel(at: NSPoint(x: 500, y: 500))
         precondition(coordinator.isMainPanelVisible)
         coordinator.closeMainPanel()

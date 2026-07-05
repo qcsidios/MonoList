@@ -60,6 +60,27 @@ final class TaskStore: ObservableObject {
             }
     }
 
+    func completedTasks(
+        on date: Date,
+        calendar: Calendar = .current
+    ) -> [TaskItem] {
+        historyTasks.filter {
+            guard let completedAt = $0.completedAt else { return false }
+            return calendar.isDate(completedAt, inSameDayAs: date)
+        }
+    }
+
+    func completedTasks(
+        before date: Date,
+        calendar: Calendar = .current
+    ) -> [TaskItem] {
+        let startOfDay = calendar.startOfDay(for: date)
+        return historyTasks.filter {
+            guard let completedAt = $0.completedAt else { return false }
+            return completedAt < startOfDay
+        }
+    }
+
     init(fileURL: URL, writer: any AtomicWriting = AtomicFileWriter()) {
         self.fileURL = fileURL
         self.writer = writer

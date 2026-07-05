@@ -17,7 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.applicationIconImage = MonoListLogoRenderer.makeImage(size: 512)
 
         let applicationSupportURL = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -30,6 +31,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fileURL: applicationSupportURL.appendingPathComponent("settings.json")
         )
         let loginController = LoginItemController()
+        if settings.launchAtLogin && loginController.status != .enabled {
+            try? loginController.setEnabled(true)
+        }
         let shortcutController = GlobalShortcutController()
         let reminderPanelController = ReminderPanelController()
         let updater = AppUpdater()
@@ -146,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             windowCoordinator?.closeMainPanel()
             let menu = NSMenu()
             menu.addItem(
-                withTitle: "设置",
+                withTitle: "打开控制台",
                 action: #selector(openSettings),
                 keyEquivalent: ","
             )
@@ -176,6 +180,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc
     private func quitApplication() {
         NSApp.terminate(nil)
+    }
+
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication,
+        hasVisibleWindows flag: Bool
+    ) -> Bool {
+        if !flag, let button = statusItem?.button {
+            windowCoordinator?.toggleMainPanel(relativeTo: button)
+        }
+        return true
     }
 
     @objc
