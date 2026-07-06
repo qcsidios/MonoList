@@ -13,6 +13,7 @@ struct AppUpdaterSmoke {
         configuration.protocolClasses = [ReleaseURLProtocol.self]
         let session = URLSession(configuration: configuration)
         ReleaseURLProtocol.requestedHosts = []
+        ReleaseURLProtocol.requestedPaths = []
         let networkUpdater = AppUpdater(
             currentVersion: "0.4.7",
             session: session
@@ -22,7 +23,12 @@ struct AppUpdaterSmoke {
             preconditionFailure("Release 页面没有返回升级")
         }
         precondition(networkUpdate.version == "v0.4.8")
-        precondition(!ReleaseURLProtocol.requestedHosts.contains("api.github.com"))
+        precondition(ReleaseURLProtocol.requestedHosts == ["api.github.com"])
+        precondition(ReleaseURLProtocol.requestedPaths == ["/repos/qcsidios/MonoList/releases/latest"])
+        precondition(
+            networkUpdate.dmgURL.absoluteString ==
+                "https://github.com/qcsidios/MonoList/releases/download/v0.4.8/MonoList-v0.4.8.dmg"
+        )
         let fallbackResult = AppUpdater.parseLatestReleaseURL(
             URL(string: "https://github.com/qcsidios/MonoList/releases/tag/v0.4.6")!,
             currentVersion: "0.4.5"
@@ -54,6 +60,7 @@ struct AppUpdaterSmoke {
 
 private final class ReleaseURLProtocol: URLProtocol {
     static var requestedHosts: [String] = []
+    static var requestedPaths: [String] = []
 
     override class func canInit(with request: URLRequest) -> Bool {
         true
@@ -69,17 +76,39 @@ private final class ReleaseURLProtocol: URLProtocol {
             return
         }
         Self.requestedHosts.append(url.host ?? "")
+        Self.requestedPaths.append(url.path)
 
         let response: HTTPURLResponse
-        if url.path.hasSuffix("/releases/latest") {
+        if url.host == "api.github.com",
+           url.path == "/repos/qcsidios/MonoList/releases/latest" {
             response = HTTPURLResponse(
                 url: url,
-                statusCode: 302,
+                statusCode: 200,
                 httpVersion: nil,
-                headerFields: [
-                    "Location": "https://github.com/qcsidios/MonoList/releases/tag/v0.4.8"
-                ]
+                headerFields: ["Content-Type": "application/json"]
             )!
+            client?.urlProtocol(
+                self,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
+            )
+            client?.urlProtocol(
+                self,
+                didLoad: Data(
+                    """
+                    {
+                      "tag_name": "v0.4.8",
+                      "assets": [
+                        {
+                          "name": "MonoList-v0.4.8.dmg",
+                          "browser_download_url": "https://github.com/qcsidios/MonoList/releases/download/v0.4.8/MonoList-v0.4.8.dmg"
+                        }
+                      ]
+                    }
+                    """.utf8
+                )
+            )
+            client?.urlProtocolDidFinishLoading(self)
         } else {
             response = HTTPURLResponse(
                 url: url,
@@ -87,15 +116,6 @@ private final class ReleaseURLProtocol: URLProtocol {
                 httpVersion: nil,
                 headerFields: nil
             )!
-        }
-        if let location = response.value(forHTTPHeaderField: "Location"),
-           let redirectURL = URL(string: location) {
-            client?.urlProtocol(
-                self,
-                wasRedirectedTo: URLRequest(url: redirectURL),
-                redirectResponse: response
-            )
-        } else {
             client?.urlProtocol(
                 self,
                 didReceive: response,

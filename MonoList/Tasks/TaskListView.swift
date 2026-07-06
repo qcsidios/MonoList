@@ -215,21 +215,11 @@ struct TaskListView: View {
                 Button("清空全部任务", role: .destructive) { clearAction = .all }
                     .disabled(store.tasks.isEmpty)
             } label: {
-                Image(systemName: "ellipsis")
-                    .offset(y: -1)
-                    .frame(width: 30, height: 30)
+                HeaderIconLabel(systemName: "ellipsis")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .frame(width: 30, height: 30)
-            .background(
-                Color.primary.opacity(0.055),
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
-            )
             .simultaneousGesture(
                 TapGesture().onEnded {
                     commitDraft()

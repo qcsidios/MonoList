@@ -75,9 +75,25 @@ final class UpdateInstaller {
         guard update.dmgURL.scheme == "https" else {
             throw UpdateInstallerError.downloadFailed
         }
+        var lastError: Error?
+        for attempt in 1...2 {
+            do {
+                return try await downloadOnce(update)
+            } catch {
+                lastError = error
+                if attempt == 1 {
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                }
+            }
+        }
+        throw lastError ?? UpdateInstallerError.downloadFailed
+    }
+
+    private func downloadOnce(_ update: AppUpdate) async throws -> URL {
         var request = URLRequest(url: update.dmgURL)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("MonoList", forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 60
+        request.timeoutInterval = 90
         let (temporaryURL, response) = try await session.download(for: request)
         guard let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode),

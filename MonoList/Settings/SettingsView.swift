@@ -115,7 +115,7 @@ struct SettingsView: View {
             Divider().opacity(0.4)
             settingsRow("提醒时段") {
                 HStack(spacing: 6) {
-                    SettingsTimeComboBox(
+                    SettingsPopupButton(
                         items: Self.startTimeItems.map(Self.timeTitle),
                         selectedTitle: Self.timeTitle(
                             settings.reminderStartMinuteOfDay
@@ -132,7 +132,7 @@ struct SettingsView: View {
                     Text("至")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    SettingsTimeComboBox(
+                    SettingsPopupButton(
                         items: Self.endTimeItems.map(Self.timeTitle),
                         selectedTitle: Self.timeTitle(
                             settings.reminderEndMinuteOfDay
@@ -169,16 +169,8 @@ struct SettingsView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(nextReminderColor)
                     .lineLimit(1)
-                    .padding(.horizontal, 9)
                     .frame(width: 180, height: 26, alignment: .center)
-                    .background(
-                        Color.primary.opacity(0.045),
-                        in: RoundedRectangle(cornerRadius: 6)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
-                    )
+                    .modifier(SettingValueBackground())
             }
             settingsRow("提醒位置") {
                 SettingsPopupButton(
@@ -388,112 +380,56 @@ private struct FixedQuietButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 13, weight: .regular))
             .frame(width: width, height: 26)
+            .modifier(SettingValueBackground(isPressed: configuration.isPressed))
+    }
+}
+
+private struct SettingsPopupButton: View {
+    let items: [String]
+    let selectedTitle: String
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(items, id: \.self) { item in
+                Button(item) {
+                    onSelect(item)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(selectedTitle)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 8)
+            .frame(height: 26)
+            .modifier(SettingValueBackground())
+        }
+        .buttonStyle(.plain)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+    }
+}
+
+private struct SettingValueBackground: ViewModifier {
+    var isPressed = false
+
+    func body(content: Content) -> some View {
+        content
             .background(
-                Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
+                Color.primary.opacity(isPressed ? 0.10 : 0.045),
                 in: RoundedRectangle(cornerRadius: 6)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
             )
-    }
-}
-
-private struct SettingsTimeComboBox: NSViewRepresentable {
-    let items: [String]
-    let selectedTitle: String
-    let onSelect: (String) -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSelect: onSelect)
-    }
-
-    func makeNSView(context: Context) -> NSComboBox {
-        let comboBox = NSComboBox()
-        comboBox.isEditable = false
-        comboBox.usesDataSource = false
-        comboBox.numberOfVisibleItems = 8
-        comboBox.hasVerticalScroller = true
-        comboBox.controlSize = .small
-        comboBox.font = .systemFont(ofSize: 12)
-        comboBox.alignment = .center
-        comboBox.delegate = context.coordinator
-        return comboBox
-    }
-
-    func updateNSView(_ comboBox: NSComboBox, context: Context) {
-        context.coordinator.onSelect = onSelect
-        if comboBox.objectValues as? [String] != items {
-            comboBox.removeAllItems()
-            comboBox.addItems(withObjectValues: items)
-        }
-        let index = comboBox.indexOfItem(withObjectValue: selectedTitle)
-        if index >= 0 && comboBox.indexOfSelectedItem != index {
-            comboBox.selectItem(at: index)
-        }
-        comboBox.stringValue = selectedTitle
-    }
-
-    final class Coordinator: NSObject, NSComboBoxDelegate {
-        var onSelect: (String) -> Void
-
-        init(onSelect: @escaping (String) -> Void) {
-            self.onSelect = onSelect
-        }
-
-        func comboBoxSelectionDidChange(_ notification: Notification) {
-            guard let comboBox = notification.object as? NSComboBox,
-                  let title = comboBox.objectValueOfSelectedItem as? String else {
-                return
-            }
-            onSelect(title)
-        }
-    }
-}
-
-private struct SettingsPopupButton: NSViewRepresentable {
-    let items: [String]
-    let selectedTitle: String
-    let onSelect: (String) -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSelect: onSelect)
-    }
-
-    func makeNSView(context: Context) -> NSPopUpButton {
-        let button = NSPopUpButton(frame: .zero, pullsDown: false)
-        button.controlSize = .small
-        button.font = .systemFont(ofSize: 12)
-        button.alignment = .center
-        button.bezelStyle = .rounded
-        button.target = context.coordinator
-        button.action = #selector(Coordinator.selectionChanged(_:))
-        return button
-    }
-
-    func updateNSView(
-        _ button: NSPopUpButton,
-        context: Context
-    ) {
-        context.coordinator.onSelect = onSelect
-        if button.itemTitles != items {
-            button.removeAllItems()
-            button.addItems(withTitles: items)
-        }
-        button.selectItem(withTitle: selectedTitle)
-    }
-
-    final class Coordinator: NSObject {
-        var onSelect: (String) -> Void
-
-        init(onSelect: @escaping (String) -> Void) {
-            self.onSelect = onSelect
-        }
-
-        @objc
-        func selectionChanged(_ sender: NSPopUpButton) {
-            guard let title = sender.selectedItem?.title else { return }
-            onSelect(title)
-        }
     }
 }

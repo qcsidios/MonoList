@@ -73,39 +73,25 @@ final class AppUpdater: ObservableObject {
     }
 
     func checkForUpdate() async -> AppUpdateCheckResult {
-        return await checkLatestReleasePage()
+        return await checkLatestReleaseAPI()
     }
 
-    private func checkLatestReleasePage() async -> AppUpdateCheckResult {
+    private func checkLatestReleaseAPI() async -> AppUpdateCheckResult {
         do {
-            var request = URLRequest(url: Self.latestReleasePageURL)
+            var request = URLRequest(url: Self.latestReleaseAPIURL)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
             request.setValue("MonoList", forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 12
-            let (_, response) = try await session.data(for: request)
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 8
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  let responseURL = http.url else {
+                  (200..<300).contains(http.statusCode) else {
                 return .failed("检测新版本失败")
             }
-            let result = Self.parseLatestReleaseURL(
-                responseURL,
+            return try Self.parseLatestReleaseAPIResponse(
+                data,
                 currentVersion: currentVersion
             )
-            guard case let .available(update) = result else {
-                return result
-            }
-
-            var assetRequest = URLRequest(url: update.dmgURL)
-            assetRequest.httpMethod = "HEAD"
-            assetRequest.setValue("MonoList", forHTTPHeaderField: "User-Agent")
-            assetRequest.timeoutInterval = 12
-            let (_, assetResponse) = try await session.data(for: assetRequest)
-            guard let assetHTTP = assetResponse as? HTTPURLResponse,
-                  (200..<300).contains(assetHTTP.statusCode),
-                  assetHTTP.url?.scheme == "https" else {
-                return .failed("更新包无效")
-            }
-            return result
         } catch {
             return .failed("检测新版本失败")
         }
@@ -141,6 +127,28 @@ final class AppUpdater: ObservableObject {
         guard let dmgURL = URL(
             string: "https://github.com/\(repository)/releases/download/\(tag)/MonoList-\(tag).dmg"
         ) else {
+            return .failed("更新包无效")
+        }
+        return .available(AppUpdate(version: tag, dmgURL: dmgURL))
+    }
+
+    static func parseLatestReleaseAPIResponse(
+        _ data: Data,
+        currentVersion: String
+    ) throws -> AppUpdateCheckResult {
+        let release = try JSONDecoder().decode(LatestReleaseResponse.self, from: data)
+        let tag = release.tagName
+        guard isValidVersionTag(tag) else {
+            return .failed("版本号无效")
+        }
+        guard compareVersions(tag, currentVersion) == .orderedDescending else {
+            return .upToDate
+        }
+        let expectedAssetName = "MonoList-\(tag).dmg"
+        guard let asset = release.assets.first(where: { $0.name == expectedAssetName }),
+              let dmgURL = URL(string: asset.browserDownloadURL),
+              dmgURL.scheme == "https",
+              dmgURL.host == "github.com" else {
             return .failed("更新包无效")
         }
         return .available(AppUpdate(version: tag, dmgURL: dmgURL))
@@ -186,4 +194,27 @@ final class AppUpdater: ObservableObject {
             as? String ?? "0.0.0"
     }
 
+    private static var latestReleaseAPIURL: URL {
+        URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
+    }
+
+    private struct LatestReleaseResponse: Decodable {
+        let tagName: String
+        let assets: [ReleaseAsset]
+
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case assets
+        }
+    }
+
+    private struct ReleaseAsset: Decodable {
+        let name: String
+        let browserDownloadURL: String
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case browserDownloadURL = "browser_download_url"
+        }
+    }
 }

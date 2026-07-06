@@ -37,6 +37,7 @@ fi
 bash scripts/check-task-store.sh
 bash scripts/check-app-launch.sh
 bash scripts/check-app-settings.sh
+bash scripts/check-ui-source-style.sh
 bash scripts/check-reminder-scheduler.sh
 bash scripts/check-menu-bar-bridge.sh
 bash scripts/check-window-coordinator.sh

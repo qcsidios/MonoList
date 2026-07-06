@@ -144,8 +144,9 @@ struct WindowCoordinatorSmoke {
             contentsOfFile: "MonoList/Settings/SettingsView.swift",
             encoding: .utf8
         )
-        precondition(settingsSource.contains("SettingsTimeComboBox("))
-        precondition(settingsSource.contains("numberOfVisibleItems = 8"))
+        precondition(settingsSource.contains("SettingsPopupButton("))
+        precondition(settingsSource.contains("SettingValueBackground"))
+        precondition(!settingsSource.contains("NSComboBox"))
         precondition(
             settingsSource.contains("FixedQuietButtonStyle(width: 180)")
         )
