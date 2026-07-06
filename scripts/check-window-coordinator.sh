@@ -21,6 +21,7 @@ swiftc \
   "$ROOT_DIR/MonoList/Settings/AppSettings.swift" \
   "$ROOT_DIR/MonoList/Settings/SettingsView.swift" \
   "$ROOT_DIR/MonoList/Settings/LoginItemController.swift" \
+  "$ROOT_DIR/MonoList/Reminder/ReminderScheduler.swift" \
   "$ROOT_DIR/MonoList/Update/AppUpdater.swift" \
   "$ROOT_DIR/MonoList/Shared/AtomicFileWriter.swift" \
   "$ROOT_DIR/MonoList/Shared/AppError.swift" \

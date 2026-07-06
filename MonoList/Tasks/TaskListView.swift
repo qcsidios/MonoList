@@ -656,7 +656,11 @@ private struct TaskDropDelegate: DropDelegate {
                     toOffset: destination > source ? destination + 1 : destination
                 )
                 do {
-                    try store.reorder(ids: ids)
+                    try withAnimation(
+                        .interactiveSpring(response: 0.22, dampingFraction: 0.88)
+                    ) {
+                        try store.reorder(ids: ids)
+                    }
                 } catch {
                     errorMessage = error.localizedDescription
                 }

@@ -138,6 +138,8 @@ struct WindowCoordinatorSmoke {
         precondition(
             taskListSource.contains("TaskDragPreview()")
         )
+        precondition(taskListSource.contains("withAnimation("))
+        precondition(taskListSource.contains(".interactiveSpring"))
         let enterDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListEnterTests-\(UUID().uuidString)")
         let enterStore = TaskStore(

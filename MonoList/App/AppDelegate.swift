@@ -34,11 +34,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? loginController.setEnabled(true)
         }
         let reminderPanelController = ReminderPanelController()
+        let scheduler = ReminderScheduler { [weak self] in
+            self?.showReminder()
+        }
         let updater = AppUpdater()
         let updateInstaller = UpdateInstaller()
         let coordinator = WindowCoordinator(taskStore: store)
         coordinator.configureSettings(
             settings: settings,
+            reminderScheduler: scheduler,
             loginItemController: loginController,
             updater: updater,
             onInstallUpdate: { [weak self] update in
@@ -100,9 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reminderPanelController?.close()
         }
 
-        let scheduler = ReminderScheduler { [weak self] in
-            self?.showReminder()
-        }
         reminderScheduler = scheduler
         store.$tasks
             .combineLatest(settings.$values)
@@ -111,6 +112,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 scheduler?.configure(
                     enabled: values.reminderEnabled,
                     intervalMinutes: values.reminderIntervalMinutes,
+                    startMinuteOfDay: values.reminderStartMinuteOfDay,
+                    endMinuteOfDay: values.reminderEndMinuteOfDay,
                     pendingCount: count
                 )
                 if !values.reminderEnabled || count == 0 {

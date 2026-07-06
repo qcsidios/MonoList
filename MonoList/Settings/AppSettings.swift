@@ -4,6 +4,7 @@ import Foundation
 enum AppSettingsError: LocalizedError {
     case recoveryRequired
     case invalidReminderInterval
+    case invalidReminderTimeRange
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +12,8 @@ enum AppSettingsError: LocalizedError {
             return "设置数据读取失败，请重试"
         case .invalidReminderInterval:
             return "提醒间隔无效"
+        case .invalidReminderTimeRange:
+            return "提醒时段无效"
         }
     }
 }
@@ -56,11 +59,67 @@ struct ShortcutDefinition: Codable, Equatable {
 struct SettingsValues: Codable, Equatable {
     var reminderEnabled = true
     var reminderIntervalMinutes = 30
+    var reminderStartMinuteOfDay = 9 * 60
+    var reminderEndMinuteOfDay = 22 * 60
     var reminderPosition = ReminderPosition.topCenter
     var reminderSoundEnabled: Bool? = true
     var launchAtLogin = false
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case reminderEnabled
+        case reminderIntervalMinutes
+        case reminderStartMinuteOfDay
+        case reminderEndMinuteOfDay
+        case reminderPosition
+        case reminderSoundEnabled
+        case launchAtLogin
+        case globalShortcut
+        case lastAutomaticUpdateCheckAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        reminderEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .reminderEnabled
+        ) ?? true
+        reminderIntervalMinutes = try container.decodeIfPresent(
+            Int.self,
+            forKey: .reminderIntervalMinutes
+        ) ?? 30
+        reminderStartMinuteOfDay = try container.decodeIfPresent(
+            Int.self,
+            forKey: .reminderStartMinuteOfDay
+        ) ?? 9 * 60
+        reminderEndMinuteOfDay = try container.decodeIfPresent(
+            Int.self,
+            forKey: .reminderEndMinuteOfDay
+        ) ?? 22 * 60
+        reminderPosition = try container.decodeIfPresent(
+            ReminderPosition.self,
+            forKey: .reminderPosition
+        ) ?? .topCenter
+        reminderSoundEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .reminderSoundEnabled
+        ) ?? true
+        launchAtLogin = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .launchAtLogin
+        ) ?? false
+        globalShortcut = try container.decodeIfPresent(
+            ShortcutDefinition.self,
+            forKey: .globalShortcut
+        )
+        lastAutomaticUpdateCheckAt = try container.decodeIfPresent(
+            Date.self,
+            forKey: .lastAutomaticUpdateCheckAt
+        )
+    }
 }
 
 private struct SettingsDatabase: Codable {
@@ -86,6 +145,8 @@ final class AppSettings: ObservableObject {
 
     var reminderEnabled: Bool { values.reminderEnabled }
     var reminderIntervalMinutes: Int { values.reminderIntervalMinutes }
+    var reminderStartMinuteOfDay: Int { values.reminderStartMinuteOfDay }
+    var reminderEndMinuteOfDay: Int { values.reminderEndMinuteOfDay }
     var reminderPosition: ReminderPosition { values.reminderPosition }
     var reminderSoundEnabled: Bool { values.reminderSoundEnabled ?? true }
     var launchAtLogin: Bool { values.launchAtLogin }
@@ -107,6 +168,12 @@ final class AppSettings: ObservableObject {
         candidate.reminderPosition = candidate.reminderPosition.supportedValue
         guard [30, 60, 90, 120].contains(candidate.reminderIntervalMinutes) else {
             throw AppSettingsError.invalidReminderInterval
+        }
+        guard Self.isValidReminderTimeRange(
+            startMinuteOfDay: candidate.reminderStartMinuteOfDay,
+            endMinuteOfDay: candidate.reminderEndMinuteOfDay
+        ) else {
+            throw AppSettingsError.invalidReminderTimeRange
         }
 
         do {
@@ -133,6 +200,13 @@ final class AppSettings: ObservableObject {
             }
             var loadedValues = database.values
             loadedValues.reminderPosition = loadedValues.reminderPosition.supportedValue
+            if !Self.isValidReminderTimeRange(
+                startMinuteOfDay: loadedValues.reminderStartMinuteOfDay,
+                endMinuteOfDay: loadedValues.reminderEndMinuteOfDay
+            ) {
+                loadedValues.reminderStartMinuteOfDay = 9 * 60
+                loadedValues.reminderEndMinuteOfDay = 22 * 60
+            }
             values = loadedValues
         } catch {
             loadError = error
@@ -145,5 +219,14 @@ final class AppSettings: ObservableObject {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(SettingsDatabase(values: values))
         try writer.write(data, to: fileURL)
+    }
+
+    static func isValidReminderTimeRange(
+        startMinuteOfDay: Int,
+        endMinuteOfDay: Int
+    ) -> Bool {
+        (0..<24 * 60).contains(startMinuteOfDay) &&
+            (1...24 * 60).contains(endMinuteOfDay) &&
+            startMinuteOfDay < endMinuteOfDay
     }
 }

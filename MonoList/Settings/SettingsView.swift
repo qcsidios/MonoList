@@ -3,12 +3,15 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var taskStore: TaskStore
+    @ObservedObject var reminderScheduler: ReminderScheduler
     @ObservedObject var loginItemController: LoginItemController
     @ObservedObject var updater: AppUpdater
     let onInstallUpdate: (AppUpdate) -> Void
     let onTestReminder: () -> Void
 
     @State private var errorMessage: String?
+    @State private var currentDate = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,6 +38,11 @@ struct SettingsView: View {
             Button("好") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
+        }
+        .onReceive(
+            Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+        ) { date in
+            currentDate = date
         }
     }
 
@@ -117,6 +125,57 @@ struct SettingsView: View {
                 }
                 .frame(width: 116, height: 26)
             }
+            settingsRow("提醒时段") {
+                HStack(spacing: 6) {
+                    SettingsPopupButton(
+                        items: Self.startTimeItems.map(Self.timeTitle),
+                        selectedTitle: Self.timeTitle(
+                            settings.reminderStartMinuteOfDay
+                        )
+                    ) { title in
+                        guard let minute = Self.minuteOfDay(for: title) else {
+                            return
+                        }
+                        updateSettings {
+                            $0.reminderStartMinuteOfDay = minute
+                        }
+                    }
+                    .frame(width: 78, height: 26)
+                    Text("至")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    SettingsPopupButton(
+                        items: Self.endTimeItems.map(Self.timeTitle),
+                        selectedTitle: Self.timeTitle(
+                            settings.reminderEndMinuteOfDay
+                        )
+                    ) { title in
+                        guard let minute = Self.minuteOfDay(for: title) else {
+                            return
+                        }
+                        updateSettings {
+                            $0.reminderEndMinuteOfDay = minute
+                        }
+                    }
+                    .frame(width: 78, height: 26)
+                }
+            }
+            settingsRow("下次提醒") {
+                Text(nextReminderText)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(nextReminderColor)
+                    .lineLimit(1)
+                    .padding(.horizontal, 9)
+                    .frame(width: 170, height: 26, alignment: .trailing)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: RoundedRectangle(cornerRadius: 6)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
+                    )
+            }
             settingsRow("提醒位置") {
                 SettingsPopupButton(
                     items: ReminderPosition.supportedCases.map(\.title),
@@ -178,6 +237,22 @@ struct SettingsView: View {
             as? String ?? "0.3.0"
     }
 
+    private var nextReminderText: String {
+        guard settings.reminderEnabled else { return "未启用" }
+        guard !taskStore.pendingTasks.isEmpty else { return "暂无待办" }
+        guard let date = reminderScheduler.nextReminderDate else {
+            return "等待调度"
+        }
+        return Self.nextReminderTitle(for: date, relativeTo: currentDate)
+    }
+
+    private var nextReminderColor: Color {
+        if settings.reminderEnabled && !taskStore.pendingTasks.isEmpty {
+            return .primary
+        }
+        return .secondary
+    }
+
     private var updateStatusColor: Color {
         if updater.availableUpdate != nil {
             return .green
@@ -211,6 +286,47 @@ struct SettingsView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    static let startTimeItems = stride(from: 0, to: 24 * 60, by: 30).map { $0 }
+    static let endTimeItems = stride(from: 30, through: 24 * 60, by: 30).map { $0 }
+
+    static func timeTitle(_ minuteOfDay: Int) -> String {
+        let hour = minuteOfDay / 60
+        let minute = minuteOfDay % 60
+        return String(format: "%02d:%02d", hour, minute)
+    }
+
+    static func minuteOfDay(for title: String) -> Int? {
+        let parts = title.split(separator: ":")
+        guard parts.count == 2,
+              let hour = Int(parts[0]),
+              let minute = Int(parts[1]) else {
+            return nil
+        }
+        return hour * 60 + minute
+    }
+
+    static func nextReminderTitle(
+        for date: Date,
+        relativeTo referenceDate: Date,
+        calendar: Calendar = .current
+    ) -> String {
+        let time = date.formatted(
+            .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)
+        )
+        if calendar.isDate(date, inSameDayAs: referenceDate) {
+            return "今天 \(time)"
+        }
+        if let tomorrow = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: calendar.startOfDay(for: referenceDate)
+        ), calendar.isDate(date, inSameDayAs: tomorrow) {
+            return "明天 \(time)"
+        }
+        let day = date.formatted(.dateTime.month().day())
+        return "\(day) \(time)"
     }
 }
 

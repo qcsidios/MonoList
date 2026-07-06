@@ -46,6 +46,7 @@ final class WindowCoordinator {
     private weak var previousApplication: NSRunningApplication?
     private var settingsWindow: NSWindow?
     private var settings: AppSettings?
+    private var reminderScheduler: ReminderScheduler?
     private var loginItemController: LoginItemController?
     private var updater: AppUpdater?
     private var onInstallUpdate: ((AppUpdate) -> Void)?
@@ -106,12 +107,14 @@ final class WindowCoordinator {
 
     func configureSettings(
         settings: AppSettings,
+        reminderScheduler: ReminderScheduler,
         loginItemController: LoginItemController,
         updater: AppUpdater,
         onInstallUpdate: @escaping (AppUpdate) -> Void,
         onTestReminder: @escaping () -> Void
     ) {
         self.settings = settings
+        self.reminderScheduler = reminderScheduler
         self.loginItemController = loginItemController
         self.updater = updater
         self.onInstallUpdate = onInstallUpdate
@@ -280,6 +283,7 @@ final class WindowCoordinator {
     func showSettings() {
         closeMainPanel()
         guard let settings,
+              let reminderScheduler,
               let loginItemController,
               let updater else {
             return
@@ -319,6 +323,8 @@ final class WindowCoordinator {
         let hostingView = NSHostingView(
             rootView: SettingsView(
                 settings: settings,
+                taskStore: taskStore,
+                reminderScheduler: reminderScheduler,
                 loginItemController: loginItemController,
                 updater: updater,
                 onInstallUpdate: onInstallUpdate ?? { _ in },

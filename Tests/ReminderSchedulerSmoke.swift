@@ -8,14 +8,28 @@ struct ReminderSchedulerSmoke {
     static func main() {
         _ = NSApplication.shared
         var now: TimeInterval = 100
+        let calendar = fixedCalendar()
+        var wallClock = fixedDate(hour: 10, minute: 0, calendar: calendar)
         var triggerCount = 0
         let scheduler = ReminderScheduler(
             now: { now },
+            wallClock: { wallClock },
+            calendar: calendar,
             onDue: { triggerCount += 1 }
         )
 
-        scheduler.configure(enabled: true, intervalMinutes: 60, pendingCount: 1)
+        scheduler.configure(
+            enabled: true,
+            intervalMinutes: 60,
+            startMinuteOfDay: 9 * 60,
+            endMinuteOfDay: 22 * 60,
+            pendingCount: 1
+        )
         precondition(scheduler.deadline == 3_700)
+        precondition(
+            scheduler.nextReminderDate ==
+                fixedDate(hour: 11, minute: 0, calendar: calendar)
+        )
 
         scheduler.pendingCountChanged(from: 1, to: 2)
         precondition(scheduler.deadline == 3_700)
@@ -41,6 +55,47 @@ struct ReminderSchedulerSmoke {
         precondition(scheduler.deadline == 11_600)
         scheduler.wake(pendingCount: 1)
         precondition(scheduler.deadline == 11_600)
+
+        precondition(
+            ReminderScheduler.nextReminderDate(
+                after: fixedDate(hour: 8, minute: 0, calendar: calendar),
+                intervalMinutes: 30,
+                startMinuteOfDay: 9 * 60,
+                endMinuteOfDay: 22 * 60,
+                calendar: calendar
+            ) == fixedDate(hour: 9, minute: 0, calendar: calendar)
+        )
+        precondition(
+            ReminderScheduler.nextReminderDate(
+                after: fixedDate(hour: 8, minute: 50, calendar: calendar),
+                intervalMinutes: 30,
+                startMinuteOfDay: 9 * 60,
+                endMinuteOfDay: 22 * 60,
+                calendar: calendar
+            ) == fixedDate(hour: 9, minute: 20, calendar: calendar)
+        )
+        precondition(
+            ReminderScheduler.nextReminderDate(
+                after: fixedDate(hour: 21, minute: 45, calendar: calendar),
+                intervalMinutes: 30,
+                startMinuteOfDay: 9 * 60,
+                endMinuteOfDay: 22 * 60,
+                calendar: calendar
+            ) == fixedDate(dayOffset: 1, hour: 9, minute: 0, calendar: calendar)
+        )
+        wallClock = fixedDate(hour: 21, minute: 45, calendar: calendar)
+        now = 20_000
+        scheduler.configure(
+            enabled: true,
+            intervalMinutes: 30,
+            startMinuteOfDay: 9 * 60,
+            endMinuteOfDay: 22 * 60,
+            pendingCount: 1
+        )
+        precondition(
+            scheduler.nextReminderDate ==
+                fixedDate(dayOffset: 1, hour: 9, minute: 0, calendar: calendar)
+        )
 
         let testTasks = ReminderPanelController.tasksForTest([])
         precondition(testTasks.count == 1)
@@ -101,5 +156,29 @@ struct ReminderSchedulerSmoke {
         controller.close(animated: false)
 
         print("Reminder scheduler smoke passed.")
+    }
+
+    private static func fixedCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private static func fixedDate(
+        dayOffset: Int = 0,
+        hour: Int,
+        minute: Int,
+        calendar: Calendar
+    ) -> Date {
+        let start = calendar.date(
+            from: DateComponents(
+                year: 2026,
+                month: 7,
+                day: 7 + dayOffset,
+                hour: hour,
+                minute: minute
+            )
+        )!
+        return start
     }
 }
