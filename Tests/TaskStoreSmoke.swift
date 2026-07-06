@@ -138,11 +138,14 @@ struct TaskStoreSmoke {
         let today = calendar.date(
             from: DateComponents(year: 2026, month: 7, day: 6, hour: 12)
         )!
-        let todayTask = try store.add(text: "今天完成")
-        let olderTask = try store.add(text: "昨天完成")
+        let todayTask = try store.add(text: "今天创建完成", createdAt: today)
+        let olderTask = try store.add(
+            text: "昨天创建今天完成",
+            createdAt: today.addingTimeInterval(-24 * 60 * 60)
+        )
 
         try store.complete(id: todayTask.id, at: today.addingTimeInterval(60))
-        try store.complete(id: olderTask.id, at: today.addingTimeInterval(-24 * 60 * 60))
+        try store.complete(id: olderTask.id, at: today.addingTimeInterval(120))
 
         try require(
             store.completedTasks(on: today, calendar: calendar).map(\.id) == [todayTask.id],

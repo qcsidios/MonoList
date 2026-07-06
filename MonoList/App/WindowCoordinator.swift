@@ -311,10 +311,10 @@ final class WindowCoordinator {
         let titleController = NSTitlebarAccessoryViewController()
         titleController.layoutAttribute = .left
         let titleLabel = NSTextField(labelWithString: window.title)
-        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
-        titleLabel.frame = NSRect(x: 0, y: 2, width: 130, height: 18)
+        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        titleLabel.frame = NSRect(x: 0, y: 0, width: 150, height: 22)
         titleController.view = NSView(
-            frame: NSRect(x: 0, y: 0, width: 130, height: 22)
+            frame: NSRect(x: 0, y: 0, width: 150, height: 22)
         )
         titleController.view.addSubview(titleLabel)
         window.addTitlebarAccessoryViewController(titleController)

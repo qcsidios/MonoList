@@ -65,8 +65,7 @@ final class TaskStore: ObservableObject {
         calendar: Calendar = .current
     ) -> [TaskItem] {
         historyTasks.filter {
-            guard let completedAt = $0.completedAt else { return false }
-            return calendar.isDate(completedAt, inSameDayAs: date)
+            calendar.isDate($0.createdAt, inSameDayAs: date)
         }
     }
 
@@ -76,8 +75,7 @@ final class TaskStore: ObservableObject {
     ) -> [TaskItem] {
         let startOfDay = calendar.startOfDay(for: date)
         return historyTasks.filter {
-            guard let completedAt = $0.completedAt else { return false }
-            return completedAt < startOfDay
+            $0.createdAt < startOfDay
         }
     }
 

@@ -14,18 +14,25 @@ struct SettingsView: View {
     @State private var currentDate = Date()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             softwareInformation
-            SettingsCard(title: "轻提醒", systemImage: "bell") {
-                reminderSettings
-            }
-            SettingsCard(title: "启动", systemImage: "power") {
-                startupSettings
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 12) {
+                    SettingsCard(title: "轻提醒", systemImage: "bell") {
+                        reminderSettings
+                    }
+                    SettingsCard(title: "启动", systemImage: "power") {
+                        startupSettings
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
         }
-        .padding(16)
         .frame(width: WindowCoordinator.settingsWindowWidth)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: 520)
         .background(Color.white)
         .environment(\.colorScheme, .light)
         .alert(
@@ -47,11 +54,11 @@ struct SettingsView: View {
     }
 
     private var softwareInformation: some View {
-        HStack(spacing: 12) {
-            MonoListLogoView(size: 46)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 14) {
+            MonoListLogoView(size: 58)
+            VStack(alignment: .leading, spacing: 6) {
                 Text("MonoList")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 28, weight: .semibold))
                 HStack(spacing: 7) {
                     Text("版本 \(appVersion)")
                         .font(.system(size: 11))
@@ -81,7 +88,7 @@ struct SettingsView: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 52)
+        .frame(minHeight: 70)
     }
 
     private var reminderSettings: some View {
@@ -166,7 +173,7 @@ struct SettingsView: View {
                     .foregroundStyle(nextReminderColor)
                     .lineLimit(1)
                     .padding(.horizontal, 9)
-                    .frame(width: 170, height: 26, alignment: .trailing)
+                    .frame(width: 180, height: 26, alignment: .trailing)
                     .background(
                         Color.primary.opacity(0.045),
                         in: RoundedRectangle(cornerRadius: 6)
@@ -226,10 +233,12 @@ struct SettingsView: View {
     ) -> some View {
         HStack {
             Text(title)
-            Spacer()
+                .font(.system(size: 14, weight: .medium))
+            Spacer(minLength: 16)
             content()
+                .frame(width: 180, alignment: .trailing)
         }
-        .frame(minHeight: 28)
+        .frame(minHeight: 34)
     }
 
     private var appVersion: String {
@@ -352,7 +361,7 @@ private struct SettingsCard<Content: View>: View {
                 .foregroundStyle(.secondary)
             content
         }
-        .padding(13)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
     }
