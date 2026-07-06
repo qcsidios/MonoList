@@ -16,6 +16,8 @@ struct TaskTextEditor: NSViewRepresentable {
         view.textContainerInset = .zero
         view.textContainer?.lineFragmentPadding = 0
         view.textContainer?.widthTracksTextView = true
+        view.setContentHuggingPriority(.required, for: .vertical)
+        view.setContentCompressionResistancePriority(.required, for: .vertical)
         view.onTextChange = { text = $0 }
         view.onFocusChange = { isFocused = $0 }
         view.onSubmit = onSubmit

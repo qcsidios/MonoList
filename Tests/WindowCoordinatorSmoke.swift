@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 
 @main
 struct WindowCoordinatorSmoke {
@@ -109,6 +110,18 @@ struct WindowCoordinatorSmoke {
         directEditor.onSubmit = { directSubmitCount += 1 }
         directEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
         precondition(directSubmitCount == 1)
+        let emptyDraftHeight = try measuredTaskEditorHeight(
+            text: "",
+            width: 310,
+            offeredHeight: 90
+        )
+        precondition(emptyDraftHeight <= 18)
+        let wrappedDraftHeight = try measuredTaskEditorHeight(
+            text: "这是一条足够长的待办内容，用来验证输入框只有在文本真的需要换行时才自动变成两行显示。",
+            width: 310,
+            offeredHeight: 90
+        )
+        precondition(wrappedDraftHeight > emptyDraftHeight)
         let enterDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListEnterTests-\(UUID().uuidString)")
         let enterStore = TaskStore(
@@ -168,5 +181,70 @@ struct WindowCoordinatorSmoke {
         precondition(!coordinator.isMainPanelVisible)
 
         print("Window coordinator smoke passed.")
+    }
+
+    @MainActor
+    private static func measuredTaskEditorHeight(
+        text: String,
+        width: CGFloat,
+        offeredHeight: CGFloat
+    ) throws -> CGFloat {
+        let view = NSHostingView(
+            rootView: TaskEditorSizingProbe(text: text)
+                .frame(width: width, height: offeredHeight)
+        )
+        view.frame = NSRect(x: 0, y: 0, width: width, height: offeredHeight)
+        let window = NSWindow(
+            contentRect: view.frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = view
+        view.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        view.layoutSubtreeIfNeeded()
+        guard let textView = findTaskTextView(in: view) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        return textView.frame.height
+    }
+
+    private static func findTaskTextView(in view: NSView) -> TaskSubmitTextView? {
+        if let textView = view as? TaskSubmitTextView {
+            return textView
+        }
+        for subview in view.subviews {
+            if let textView = findTaskTextView(in: subview) {
+                return textView
+            }
+        }
+        return nil
+    }
+}
+
+private struct TaskEditorSizingProbe: View {
+    @State private var text: String
+    @State private var isFocused = false
+
+    init(text: String) {
+        _text = State(initialValue: text)
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 9) {
+            Image(systemName: "circle")
+                .font(.system(size: 18))
+                .frame(width: 28, height: 28)
+            TaskTextEditor(
+                text: $text,
+                isFocused: $isFocused,
+                onSubmit: {}
+            )
+            .padding(.vertical, 5)
+            Color.clear.frame(width: 28, height: 28)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
     }
 }
