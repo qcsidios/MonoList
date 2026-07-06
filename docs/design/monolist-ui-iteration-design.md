@@ -5,6 +5,8 @@
 > 当前确认范围：今天视图、新增草稿、已完成任务与历史记录的展示逻辑
 > 对应代码稿：`docs/design/completed-tasks-reference.html`、`docs/design/task-input-reference.html`、`docs/design/logo-final-reference.html`、`docs/design/settings-window-reference.html`、`docs/design/task-actions-reference.html`
 
+> v0.3 更新：主清单宽度、草稿入口、窗口滚动、控制台尺寸、提醒位置、启动默认值和快捷键规则，以 `docs/superpowers/specs/2026-07-06-monolist-v0.3-design.md` 及其最终视觉稿为准；本文件中的旧尺寸和旧设置规则不再适用。
+
 ## 1. 文档用途
 
 本文件和对应 HTML 是本轮 MonoList 本地迭代的视觉与交互基准。开发时必须直接对照代码稿实现，不得仅凭聊天记录或记忆重新设计。
