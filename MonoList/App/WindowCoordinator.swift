@@ -12,6 +12,16 @@ final class WindowCoordinator {
         contentHeight > mainPanelMaximumHeight
     }
 
+    static func fallbackMainPanelAnchor(
+        in screenFrame: NSRect,
+        statusBarThickness: CGFloat = NSStatusBar.system.thickness
+    ) -> NSPoint {
+        NSPoint(
+            x: screenFrame.maxX - mainPanelWidth / 2 - 8,
+            y: screenFrame.maxY - statusBarThickness - 6
+        )
+    }
+
     var onOpenSettings: (() -> Void)?
     var onWillShowMainPanel: (() -> Void)?
 
@@ -120,7 +130,7 @@ final class WindowCoordinator {
     }
 
     func showMainPanel(at anchor: NSPoint) {
-        closeMainPanel()
+        closeMainPanel(animated: false)
         onWillShowMainPanel?()
         rememberFrontmostApplication()
         draftState.syncVisibility(hasPendingTasks: !taskStore.pendingTasks.isEmpty)
@@ -134,7 +144,7 @@ final class WindowCoordinator {
         )
         let originY = max(
             visibleFrame.minY + 8,
-            anchor.y - panel.frame.height - 6
+            anchor.y - panel.frame.height
         )
         let finalFrame = NSRect(
             x: originX,
@@ -155,6 +165,13 @@ final class WindowCoordinator {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
             panel.animator().setFrame(finalFrame, display: true)
+        } completionHandler: { [weak self, weak panel] in
+            Task { @MainActor in
+                guard let self,
+                      let panel,
+                      self.mainPanel === panel else { return }
+                panel.setFrame(finalFrame, display: true)
+            }
         }
         DispatchQueue.main.async { [weak self, weak panel] in
             guard let self, let panel, self.mainPanel === panel else { return }
@@ -162,7 +179,10 @@ final class WindowCoordinator {
         }
     }
 
-    func closeMainPanel(restoringFocus: Bool = false) {
+    func closeMainPanel(
+        restoringFocus: Bool = false,
+        animated: Bool = true
+    ) {
         removeOutsideClickMonitor()
         if draftState.isPresented {
             try? draftState.commitOrDismiss(to: taskStore)
@@ -171,8 +191,22 @@ final class WindowCoordinator {
         pendingResizeWorkItem = nil
         mainPanelResizeTimer?.invalidate()
         mainPanelResizeTimer = nil
-        mainPanel?.orderOut(nil)
+        let panel = mainPanel
         mainPanel = nil
+        if animated, let panel, panel.isVisible {
+            var targetFrame = panel.frame
+            targetFrame.origin.y += 4
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.16
+                context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+                panel.animator().alphaValue = 0
+                panel.animator().setFrame(targetFrame, display: true)
+            } completionHandler: {
+                panel.orderOut(nil)
+            }
+        } else {
+            panel?.orderOut(nil)
+        }
 
         if restoringFocus,
            let previousApplication,
@@ -352,12 +386,26 @@ final class WindowCoordinator {
     }
 
     private func showMainPanel(relativeTo button: NSStatusBarButton) {
-        guard let buttonWindow = button.window else {
-            showMainPanel(at: NSEvent.mouseLocation)
-            return
+        if let buttonWindow = button.window {
+            let buttonFrame = buttonWindow.convertToScreen(button.frame)
+            if let screen = NSScreen.screens.first(
+                where: {
+                    $0.frame.intersects(buttonFrame) &&
+                        buttonFrame.midX > $0.frame.midX
+                }
+            ) {
+                showMainPanel(
+                    at: NSPoint(
+                        x: buttonFrame.midX,
+                        y: screen.frame.maxY -
+                            NSStatusBar.system.thickness - 6
+                    )
+                )
+                return
+            }
         }
-        let buttonFrame = buttonWindow.convertToScreen(button.frame)
-        showMainPanel(at: NSPoint(x: buttonFrame.midX, y: buttonFrame.minY))
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        showMainPanel(at: Self.fallbackMainPanelAnchor(in: screen.frame))
     }
 
     private func rememberFrontmostApplication() {
@@ -409,6 +457,13 @@ private final class MainPanel: NSPanel {
 
     override func cancelOperation(_ sender: Any?) {
         onCancel?()
+    }
+
+    override func constrainFrameRect(
+        _ frameRect: NSRect,
+        to screen: NSScreen?
+    ) -> NSRect {
+        frameRect
     }
 }
 

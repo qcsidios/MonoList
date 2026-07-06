@@ -14,6 +14,16 @@ struct WindowCoordinatorSmoke {
         precondition(WindowCoordinator.mainPanelWidth == 336)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 480)
         precondition(WindowCoordinator.settingsWindowWidth == 430)
+        let visibleFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let fallbackAnchor = WindowCoordinator.fallbackMainPanelAnchor(
+            in: visibleFrame,
+            statusBarThickness: 24
+        )
+        precondition(fallbackAnchor.y == visibleFrame.maxY - 24 - 6)
+        precondition(
+            fallbackAnchor.x == visibleFrame.maxX -
+                WindowCoordinator.mainPanelWidth / 2 - 8
+        )
         let originalFrame = NSRect(x: 120, y: 300, width: 336, height: 180)
         let expandedFrame = WindowCoordinator.mainPanelFrame(
             keepingTopOf: originalFrame,

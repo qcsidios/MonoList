@@ -207,7 +207,7 @@ final class ReminderPanelController: ObservableObject {
     }
 
     private func panelHeight(for taskCount: Int) -> CGFloat {
-        CGFloat(92 + taskCount * 46)
+        CGFloat(80 + taskCount * 40)
     }
 
     private func frame(

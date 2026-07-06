@@ -266,7 +266,6 @@ private struct SettingsMenuControl<Content: View>: View {
     let text: String
     @ViewBuilder let content: Content
     @State private var isHovered = false
-    @GestureState private var isPressed = false
 
     init(
         text: String,
@@ -291,9 +290,7 @@ private struct SettingsMenuControl<Content: View>: View {
         .menuIndicator(.hidden)
         .frame(width: 116, height: 26)
         .background(
-            Color.primary.opacity(
-                isPressed ? 0.14 : (isHovered ? 0.10 : 0.055)
-            ),
+            Color.primary.opacity(isHovered ? 0.10 : 0.055),
             in: RoundedRectangle(cornerRadius: 6)
         )
         .overlay(
@@ -312,11 +309,5 @@ private struct SettingsMenuControl<Content: View>: View {
             .allowsHitTesting(false)
         }
         .onHover { isHovered = $0 }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .updating($isPressed) { _, state, _ in
-                    state = true
-                }
-        )
     }
 }

@@ -40,6 +40,7 @@ bash scripts/check-app-settings.sh
 bash scripts/check-reminder-scheduler.sh
 bash scripts/check-status-item-label.sh
 bash scripts/check-window-coordinator.sh
+bash scripts/check-project-integrity.sh
 bash scripts/check-app-updater.sh
 bash scripts/check-update-installer.sh
 MONOLIST_APP_VERSION="$VERSION" bash scripts/package-dmg.sh >/dev/null
@@ -47,6 +48,7 @@ bash scripts/check-release-signature.sh
 bash scripts/check-dmg-layout.sh "$DMG_PATH"
 
 if [[ "$MODE" == "--dry-run" ]]; then
+  bash scripts/cleanup-build.sh
   echo "Release dry run passed: $VERSION"
   exit 0
 fi
@@ -58,4 +60,5 @@ gh release create "$VERSION" "$DMG_PATH" \
   --draft \
   --title "$VERSION" \
   --notes-file "$NOTES_PATH"
+bash scripts/cleanup-build.sh
 echo "Draft Release 已创建：$VERSION"

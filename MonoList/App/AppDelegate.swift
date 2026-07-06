@@ -229,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateStatusItem(_ item: NSStatusItem, pendingCount: Int) {
-        item.button?.attributedTitle = StatusItemLabel.attributedTitle(
+        item.button?.title = StatusItemLabel.title(
             pendingCount: pendingCount
         )
         item.button?.setAccessibilityTitle(

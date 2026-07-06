@@ -52,7 +52,7 @@ struct TaskListView: View {
             (draftState.isPresented ? 1 : 0)
         let dateHeaders = showsOlderCompleted ? completedGroups.count : 0
         return 55 +
-            21 +
+            14 +
             CGFloat(rows * 42) +
             CGFloat(extraLines * 18) +
             35 +
@@ -156,20 +156,23 @@ struct TaskListView: View {
         ZStack(alignment: .top) {
             Color.clear
                 .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    presentDraft(after: store.pendingTasks.last?.id)
+                }
                 .onTapGesture {
                     clearFocus()
                 }
 
             VStack(spacing: 2) {
                 pendingRows
-                if draftState.isPresented {
+                if draftState.isPresented && draftState.afterID == nil {
                     draftRow
                 }
                 completedSection
             }
             .padding(.horizontal, 7)
             .padding(.top, 7)
-            .padding(.bottom, 14)
+            .padding(.bottom, 7)
             .frame(maxWidth: .infinity, alignment: .top)
         }
     }
@@ -186,10 +189,7 @@ struct TaskListView: View {
 
             Button {
                 commitDraft()
-                draftState.present(after: store.pendingTasks.last?.id)
-                DispatchQueue.main.async {
-                    draftFocused = true
-                }
+                presentDraft(after: store.pendingTasks.last?.id)
             } label: {
                 HeaderIconLabel(systemName: "plus")
             }
@@ -259,6 +259,9 @@ struct TaskListView: View {
                 },
                 onMoveUp: perform { try store.move(id: item.id, by: -1) },
                 onMoveDown: perform { try store.move(id: item.id, by: 1) },
+                onInsertAfter: {
+                    presentDraft(after: item.id)
+                },
                 isSelected: selectedTaskID == item.id,
                 onSelect: { selectedTaskID = item.id },
                 onEditingChanged: { editing in
@@ -276,6 +279,11 @@ struct TaskListView: View {
                     errorMessage: $errorMessage
                 )
             )
+
+            if draftState.isPresented && draftState.afterID == item.id {
+                draftRow
+                    .id("task-draft-row")
+            }
         }
     }
 
@@ -389,6 +397,13 @@ struct TaskListView: View {
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func presentDraft(after id: UUID?) {
+        draftState.present(after: id)
+        DispatchQueue.main.async {
+            draftFocused = true
         }
     }
 
