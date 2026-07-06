@@ -51,7 +51,7 @@ final class AppUpdater: ObservableObject {
 
         isChecking = true
         if manual {
-            statusText = "正在检测…"
+            statusText = "检查中…"
         }
         defer { isChecking = false }
 
@@ -89,6 +89,16 @@ final class AppUpdater: ObservableObject {
         } catch {
             return .failed("检测新版本失败")
         }
+    }
+
+    func beginInstallation() {
+        isInstalling = true
+        statusText = "下载并安装中…"
+    }
+
+    func installationFailed() {
+        isInstalling = false
+        statusText = "升级失败"
     }
 
     static func parseRelease(

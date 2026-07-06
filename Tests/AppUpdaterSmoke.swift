@@ -47,6 +47,13 @@ struct AppUpdaterSmoke {
             lastCheckedAt: Date(),
             now: Date()
         ))
+        let updater = AppUpdater(currentVersion: "0.4.3")
+        updater.beginInstallation()
+        precondition(updater.isInstalling)
+        precondition(updater.statusText == "下载并安装中…")
+        updater.installationFailed()
+        precondition(!updater.isInstalling)
+        precondition(updater.statusText == "升级失败")
         print("App updater smoke passed.")
     }
 }

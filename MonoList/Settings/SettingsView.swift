@@ -47,31 +47,26 @@ struct SettingsView: View {
                     Text("版本 \(appVersion)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Button("检测新版本") {
+                    Button(updater.isChecking ? "检测中…" : "检测新版本") {
                         Task {
                             await updater.check(manual: true, settings: settings)
                         }
                     }
-                    .buttonStyle(QuietButtonStyle())
+                    .buttonStyle(InlineUpdateButtonStyle())
                     .disabled(updater.isChecking)
 
-                    if updater.isChecking {
-                        Text("正在检测…")
+                    if !updater.statusText.isEmpty {
+                        Text(updater.statusText)
                             .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        if !updater.statusText.isEmpty {
-                            Text(updater.statusText)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            .foregroundStyle(updateStatusColor)
+                            .lineLimit(1)
+                    }
+                    if let update = updater.availableUpdate {
+                        Button(updater.isInstalling ? "升级中…" : "升级") {
+                            onInstallUpdate(update)
                         }
-                        if let update = updater.availableUpdate {
-                            Button("升级到 \(update.version)") {
-                                onInstallUpdate(update)
-                            }
-                            .buttonStyle(QuietButtonStyle())
-                        }
+                        .buttonStyle(InlineUpdateButtonStyle())
+                        .disabled(updater.isInstalling)
                     }
                 }
             }
@@ -106,28 +101,34 @@ struct SettingsView: View {
             }
             Divider().opacity(0.4)
             settingsRow("提醒间隔") {
-                SettingsMenuControl(
-                    text: "\(settings.reminderIntervalMinutes) 分钟"
+                SettingsPopupButton(
+                    items: [30, 60, 90, 120].map { "\($0) 分钟" },
+                    selectedTitle: "\(settings.reminderIntervalMinutes) 分钟"
                 ) {
-                    ForEach([30, 60, 90, 120], id: \.self) { interval in
-                        Button("\(interval) 分钟") {
-                            updateSettings {
-                                $0.reminderIntervalMinutes = interval
-                            }
-                        }
+                    guard let interval = Int($0.split(separator: " ").first ?? "") else {
+                        return
+                    }
+                    updateSettings {
+                        $0.reminderIntervalMinutes = interval
                     }
                 }
+                .frame(width: 116, height: 26)
             }
             settingsRow("提醒位置") {
-                SettingsMenuControl(text: settings.reminderPosition.title) {
-                    ForEach(ReminderPosition.supportedCases) { position in
-                        Button(position.title) {
-                            updateSettings {
-                                $0.reminderPosition = position
-                            }
-                        }
+                SettingsPopupButton(
+                    items: ReminderPosition.supportedCases.map(\.title),
+                    selectedTitle: settings.reminderPosition.title
+                ) { title in
+                    guard let position = ReminderPosition.supportedCases.first(
+                        where: { $0.title == title }
+                    ) else {
+                        return
+                    }
+                    updateSettings {
+                        $0.reminderPosition = position
                     }
                 }
+                .frame(width: 116, height: 26)
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
@@ -172,6 +173,17 @@ struct SettingsView: View {
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
             as? String ?? "0.3.0"
+    }
+
+    private var updateStatusColor: Color {
+        if updater.availableUpdate != nil {
+            return .green
+        }
+        if updater.statusText.contains("失败") ||
+            updater.statusText.contains("无法") {
+            return .red
+        }
+        return .secondary
     }
 
     private func binding<Value>(
@@ -227,18 +239,18 @@ private struct SettingsCard<Content: View>: View {
     }
 }
 
-private struct QuietButtonStyle: ButtonStyle {
+private struct InlineUpdateButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .medium))
             .padding(.horizontal, 8)
-            .frame(height: 26)
+            .frame(height: 22)
             .background(
                 Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
-                in: RoundedRectangle(cornerRadius: 6)
+                in: Capsule()
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                Capsule()
                     .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
             )
     }
@@ -249,7 +261,7 @@ private struct FixedQuietButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .regular))
+            .font(.system(size: 13, weight: .regular))
             .frame(width: width, height: 26)
             .background(
                 Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
@@ -262,52 +274,46 @@ private struct FixedQuietButtonStyle: ButtonStyle {
     }
 }
 
-private struct SettingsMenuControl<Content: View>: View {
-    let text: String
-    @ViewBuilder let content: Content
-    @State private var isHovered = false
+private struct SettingsPopupButton: NSViewRepresentable {
+    let items: [String]
+    let selectedTitle: String
+    let onSelect: (String) -> Void
 
-    init(
-        text: String,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.text = text
-        self.content = content()
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelect: onSelect)
     }
 
-    var body: some View {
-        Menu {
-            content
-        } label: {
-            Text(text)
-                .padding(.leading, 9)
-                .padding(.trailing, 26)
-            .font(.system(size: 12, weight: .regular))
-            .foregroundStyle(.primary)
-            .frame(width: 116, height: 26, alignment: .leading)
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: 12)
+        button.bezelStyle = .rounded
+        button.addItems(withTitles: items)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectionChanged(_:))
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.onSelect = onSelect
+        if button.itemTitles != items {
+            button.removeAllItems()
+            button.addItems(withTitles: items)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: 116, height: 26)
-        .background(
-            Color.primary.opacity(isHovered ? 0.10 : 0.055),
-            in: RoundedRectangle(cornerRadius: 6)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
-        .overlay(alignment: .trailing) {
-            HStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color.primary.opacity(0.08))
-                    .frame(width: 0.5, height: 16)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .frame(width: 26, height: 26)
-            }
-            .allowsHitTesting(false)
+        button.selectItem(withTitle: selectedTitle)
+    }
+
+    final class Coordinator: NSObject {
+        var onSelect: (String) -> Void
+
+        init(onSelect: @escaping (String) -> Void) {
+            self.onSelect = onSelect
         }
-        .onHover { isHovered = $0 }
+
+        @objc
+        func selectionChanged(_ sender: NSPopUpButton) {
+            guard let title = sender.selectedItem?.title else { return }
+            onSelect(title)
+        }
     }
 }

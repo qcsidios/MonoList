@@ -53,6 +53,11 @@ struct ReminderSchedulerSmoke {
         precondition(startFrame.minX == finalFrame.minX)
         precondition(startFrame.minY == finalFrame.minY + 8)
 
+        guard !NSScreen.screens.isEmpty else {
+            print("Reminder scheduler smoke passed (界面用例因无可用屏幕而跳过).")
+            return
+        }
+
         var soundCount = 0
         let controller = ReminderPanelController(playSound: { soundCount += 1 })
         controller.show(

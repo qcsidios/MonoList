@@ -19,7 +19,7 @@ struct WindowCoordinatorSmoke {
             in: visibleFrame,
             statusBarThickness: 24
         )
-        precondition(fallbackAnchor.y == visibleFrame.maxY - 24 - 6)
+        precondition(fallbackAnchor.y == visibleFrame.maxY - 24)
         precondition(
             fallbackAnchor.x == visibleFrame.maxX -
                 WindowCoordinator.mainPanelWidth / 2 - 8

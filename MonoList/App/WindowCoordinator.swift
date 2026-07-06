@@ -18,7 +18,7 @@ final class WindowCoordinator {
     ) -> NSPoint {
         NSPoint(
             x: screenFrame.maxX - mainPanelWidth / 2 - 8,
-            y: screenFrame.maxY - statusBarThickness - 6
+            y: screenFrame.maxY - statusBarThickness
         )
     }
 
@@ -280,21 +280,16 @@ final class WindowCoordinator {
                 width: Self.mainPanelWidth,
                 height: initialHeight
             ),
-            styleMask: [.titled, .fullSizeContentView],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         panel.canBecomeKeyOverride = true
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
-        panel.standardWindowButton(.closeButton)?.isHidden = true
-        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
         panel.level = .floating
         panel.collectionBehavior = [.transient, .moveToActiveSpace]
         panel.onCancel = { [weak self] in
@@ -398,7 +393,7 @@ final class WindowCoordinator {
                     at: NSPoint(
                         x: buttonFrame.midX,
                         y: screen.frame.maxY -
-                            NSStatusBar.system.thickness - 6
+                            NSStatusBar.system.thickness
                     )
                 )
                 return
@@ -459,6 +454,21 @@ private final class MainPanel: NSPanel {
         onCancel?()
     }
 
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown,
+           let editor = firstResponder as? NSTextView,
+           let control = editor.delegate as? NSView,
+           let contentView {
+            let point = contentView.convert(event.locationInWindow, from: nil)
+            if let hitView = contentView.hitTest(point),
+               hitView !== control,
+               !hitView.isDescendant(of: control) {
+                makeFirstResponder(nil)
+            }
+        }
+        super.sendEvent(event)
+    }
+
     override func constrainFrameRect(
         _ frameRect: NSRect,
         to screen: NSScreen?
@@ -469,6 +479,6 @@ private final class MainPanel: NSPanel {
 
 private final class MainPanelHostingView<Content: View>: NSHostingView<Content> {
     override var mouseDownCanMoveWindow: Bool {
-        true
+        false
     }
 }

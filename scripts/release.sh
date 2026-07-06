@@ -38,7 +38,6 @@ bash scripts/check-task-store.sh
 bash scripts/check-app-launch.sh
 bash scripts/check-app-settings.sh
 bash scripts/check-reminder-scheduler.sh
-bash scripts/check-status-item-label.sh
 bash scripts/check-window-coordinator.sh
 bash scripts/check-project-integrity.sh
 bash scripts/check-app-updater.sh

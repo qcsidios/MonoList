@@ -185,7 +185,9 @@ struct TaskListView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
-            Spacer()
+            WindowDragArea()
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
 
             Button {
                 commitDraft()
@@ -491,6 +493,20 @@ private struct HeaderIconLabel: View {
                     .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
             )
             .onHover { isHovered = $0 }
+    }
+}
+
+private struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        DraggingNSView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class DraggingNSView: NSView {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 }
 

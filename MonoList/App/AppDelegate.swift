@@ -42,16 +42,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             updater: updater,
             onInstallUpdate: { [weak self] update in
                 Task { @MainActor in
+                    self?.appUpdater?.beginInstallation()
                     do {
                         try await self?.updateInstaller?.install(update)
                     } catch {
+                        self?.appUpdater?.installationFailed()
                         let alert = NSAlert()
                         alert.messageText = "升级失败"
                         alert.informativeText = error.localizedDescription
                         alert.addButton(withTitle: "重试")
                         alert.addButton(withTitle: "取消")
                         if alert.runModal() == .alertFirstButtonReturn {
-                            try? await self?.updateInstaller?.install(update)
+                            self?.appUpdater?.beginInstallation()
+                            do {
+                                try await self?.updateInstaller?.install(update)
+                            } catch {
+                                self?.appUpdater?.installationFailed()
+                            }
                         }
                     }
                 }
@@ -67,7 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        updateStatusItem(item, pendingCount: store.pendingTasks.count)
+        item.autosaveName = "MonoListStatusItem"
+        item.isVisible = true
+        item.button?.title = "待办"
         item.button?.toolTip = "MonoList"
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
@@ -76,9 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.$tasks
             .map { tasks in tasks.filter { $0.status == .pending }.count }
             .removeDuplicates()
-            .sink { [weak self, weak item] count in
-                guard let item else { return }
-                self?.updateStatusItem(item, pendingCount: count)
+            .sink { [weak item] count in
+                item?.button?.title = count == 0 ? "待办" : "待办 \(count)"
             }
             .store(in: &cancellables)
 
@@ -225,15 +233,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     )
                 }
             }
-        )
-    }
-
-    private func updateStatusItem(_ item: NSStatusItem, pendingCount: Int) {
-        item.button?.title = StatusItemLabel.title(
-            pendingCount: pendingCount
-        )
-        item.button?.setAccessibilityTitle(
-            StatusItemLabel.accessibilityTitle(pendingCount: pendingCount)
         )
     }
 }
