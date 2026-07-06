@@ -113,6 +113,11 @@ struct TaskRowView: View {
                 isEditorFocused = false
             }
         }
+        .onDisappear {
+            if isEditingMode {
+                finishEditing()
+            }
+        }
         .contextMenu {
             Button("上移", action: onMoveUp)
             Button("下移", action: onMoveDown)

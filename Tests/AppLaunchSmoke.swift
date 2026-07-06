@@ -47,6 +47,7 @@ struct AppLaunchSmoke {
         try require(plist["LSMinimumSystemVersion"] as? String == "14.0",
                     "最低系统版本必须为 macOS 14.0")
         try requireNormalIconSafeArea(iconPNGURL)
+        try requireSimplifiedIcon(iconPNGURL)
 
         print("App launch smoke passed.")
     }
@@ -78,6 +79,29 @@ struct AppLaunchSmoke {
         try require(
             occupiedWidth >= 780 && occupiedHeight >= 780,
             "Dock 图标缩得过小"
+        )
+    }
+
+    private static func requireSimplifiedIcon(_ url: URL) throws {
+        guard let data = try? Data(contentsOf: url),
+              let image = NSBitmapImageRep(data: data) else {
+            throw SmokeFailure.failed("无法读取 AppIcon PNG")
+        }
+        let background = image.colorAt(
+            x: image.pixelsWide / 2,
+            y: image.pixelsHigh * 78 / 100
+        )
+        let symbol = image.colorAt(
+            x: image.pixelsWide * 28 / 100,
+            y: image.pixelsHigh / 2
+        )
+        try require(
+            (background?.brightnessComponent ?? 0) >= 0.9,
+            "Dock 图标必须使用白色背景"
+        )
+        try require(
+            symbol?.brightnessComponent ?? 1 < 0.2,
+            "Dock 图标必须使用黑色圆圈"
         )
     }
 

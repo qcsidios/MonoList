@@ -21,7 +21,7 @@ open build/local/MonoList.app
 ## 功能
 
 - Dock 与菜单栏同时常驻
-- 只有按 Enter 才保存的内联待办输入
+- 按 Enter 或点击空白处保存的内联待办输入
 - 双击编辑、整行拖动排序、单条删除
 - 当天完成任务保留在底部，较早记录可显示或隐藏
 - 30 / 60 / 90 / 120 分钟轻提醒
@@ -45,5 +45,5 @@ Developer ID、不进行 Apple 公证，也不上架 App Store。首次运行时
 构建发布包：
 
 ```bash
-MONOLIST_APP_VERSION=v0.3.0 bash scripts/package-dmg.sh
+MONOLIST_APP_VERSION=v0.4.0 bash scripts/package-dmg.sh
 ```

@@ -52,7 +52,7 @@ struct TaskListView: View {
             (draftState.isPresented ? 1 : 0)
         let dateHeaders = showsOlderCompleted ? completedGroups.count : 0
         return 55 +
-            14 +
+            21 +
             CGFloat(rows * 42) +
             CGFloat(extraLines * 18) +
             35 +
@@ -83,15 +83,16 @@ struct TaskListView: View {
             }
         }
         .frame(width: WindowCoordinator.mainPanelWidth, height: preferredHeight)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .environment(\.colorScheme, .light)
         .onAppear {
             draftState.syncVisibility(hasPendingTasks: !store.pendingTasks.isEmpty)
             installKeyboardMonitor()
             onHeightChanged(preferredHeight)
         }
         .onDisappear {
-            draftState.dismissIfEmpty()
+            commitDraft()
             removeKeyboardMonitor()
         }
         .onChange(of: preferredHeight) { _, height in
@@ -165,7 +166,8 @@ struct TaskListView: View {
                 completedSection
             }
             .padding(.horizontal, 7)
-            .padding(.vertical, 7)
+            .padding(.top, 7)
+            .padding(.bottom, 14)
             .frame(maxWidth: .infinity, alignment: .top)
         }
     }
@@ -181,19 +183,15 @@ struct TaskListView: View {
             Spacer()
 
             Button {
+                commitDraft()
                 draftState.present(after: store.pendingTasks.last?.id)
                 DispatchQueue.main.async {
                     draftFocused = true
                 }
             } label: {
-                Image(systemName: "plus")
-                    .frame(width: 30, height: 30)
-                    .background(
-                        Color.primary.opacity(0.045),
-                        in: RoundedRectangle(cornerRadius: 8)
-                    )
+                HeaderIconLabel(systemName: "plus")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HeaderIconButtonStyle())
             .help("新增待办")
 
             Menu {
@@ -207,25 +205,32 @@ struct TaskListView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .frame(width: 30, height: 30)
-                    .background(
-                        Color.primary.opacity(0.045),
-                        in: RoundedRectangle(cornerRadius: 8)
-                    )
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .background(
+                Color.primary.opacity(0.055),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
+            )
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    commitDraft()
+                }
+            )
             .help("更多操作")
 
-            Button(action: onOpenSettings) {
-                Image(systemName: "gearshape")
-                    .frame(width: 30, height: 30)
-                    .background(
-                        Color.primary.opacity(0.045),
-                        in: RoundedRectangle(cornerRadius: 8)
-                    )
+            Button {
+                commitDraft()
+                onOpenSettings()
+            } label: {
+                HeaderIconLabel(systemName: "gearshape")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HeaderIconButtonStyle())
             .help("打开控制台")
         }
         .padding(.leading, 14)
@@ -300,10 +305,11 @@ struct TaskListView: View {
                     }
                 }
                 .onSubmit {
-                    do {
-                        _ = try draftState.submit(to: store)
-                    } catch {
-                        errorMessage = error.localizedDescription
+                    commitDraft()
+                }
+                .onChange(of: draftFocused) { oldValue, newValue in
+                    if oldValue && !newValue {
+                        commitDraft()
                     }
                 }
                 .padding(.vertical, 5)
@@ -325,6 +331,7 @@ struct TaskListView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(showsOlderCompleted ? "隐藏" : "显示") {
+                    commitDraft()
                     showsOlderCompleted.toggle()
                 }
                 .buttonStyle(.plain)
@@ -365,15 +372,20 @@ struct TaskListView: View {
     }
 
     private func clearFocus() {
+        commitDraft()
         selectedTaskID = nil
         editingTaskID = nil
-        if store.pendingTasks.isEmpty {
-            draftState.syncVisibility(hasPendingTasks: false)
-        } else {
-            draftState.dismissIfEmpty()
-        }
         draftFocused = false
         NSApp.keyWindow?.makeFirstResponder(nil)
+    }
+
+    private func commitDraft() {
+        guard draftState.isPresented else { return }
+        do {
+            try draftState.commitOrDismiss(to: store)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func estimatedAdditionalLines(for text: String) -> Int {
@@ -441,6 +453,34 @@ struct TaskListView: View {
         _ action: @escaping (Value) throws -> Void
     ) -> (Value) -> Void {
         { value in performAction { try action(value) } }
+    }
+}
+
+private struct HeaderIconLabel: View {
+    let systemName: String
+    @State private var isHovered = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .frame(width: 30, height: 30)
+            .background(
+                Color.primary.opacity(isHovered ? 0.09 : 0.055),
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
+            )
+            .onHover { isHovered = $0 }
+    }
+}
+
+private struct HeaderIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.78 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }
 

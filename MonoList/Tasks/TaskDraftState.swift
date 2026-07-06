@@ -24,6 +24,16 @@ final class TaskDraftState: ObservableObject {
         isPresented = true
     }
 
+    func commitOrDismiss(to store: TaskStore) throws {
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            text = ""
+            afterID = nil
+            isPresented = false
+        } else {
+            try submit(to: store)
+        }
+    }
+
     func syncVisibility(hasPendingTasks: Bool) {
         if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             isPresented = true

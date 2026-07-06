@@ -51,46 +51,40 @@ for variant in variants {
     NSColor.clear.setFill()
     fullRect.fill()
 
-    NSColor.black.setFill()
-    NSBezierPath(
-        roundedRect: fullRect.insetBy(dx: 10 * scale, dy: 10 * scale),
+    let tileRect = fullRect.insetBy(dx: 10 * scale, dy: 10 * scale)
+    let tile = NSBezierPath(
+        roundedRect: tileRect,
         xRadius: 21 * scale,
         yRadius: 21 * scale
-    ).fill()
+    )
+    NSColor.white.setFill()
+    tile.fill()
+    NSColor(calibratedWhite: 0.82, alpha: 1).setStroke()
+    tile.lineWidth = max(0.5, 0.8 * scale)
+    tile.stroke()
 
     let strokeWidth = max(1, 5.2 * scale)
-    let radius = 11.5 * scale
-    let circleX = 29 * scale
-    let rowYs = [66 * scale, 34 * scale]
-    NSColor.white.setStroke()
-
-    for y in rowYs {
-        let circle = NSBezierPath(
-            ovalIn: NSRect(
-                x: circleX - radius,
-                y: y - radius,
-                width: radius * 2,
-                height: radius * 2
-            )
+    let radius = 22 * scale
+    let center = NSPoint(x: 50 * scale, y: 50 * scale)
+    NSColor.black.setStroke()
+    let circle = NSBezierPath(
+        ovalIn: NSRect(
+            x: center.x - radius,
+            y: center.y - radius,
+            width: radius * 2,
+            height: radius * 2
         )
-        circle.lineWidth = strokeWidth
-        circle.stroke()
-
-        let line = NSBezierPath()
-        line.lineCapStyle = .round
-        line.lineWidth = strokeWidth
-        line.move(to: NSPoint(x: 51 * scale, y: y))
-        line.line(to: NSPoint(x: 79 * scale, y: y))
-        line.stroke()
-    }
+    )
+    circle.lineWidth = strokeWidth
+    circle.stroke()
 
     let check = NSBezierPath()
     check.lineCapStyle = .round
     check.lineJoinStyle = .round
-    check.lineWidth = max(1, 3.8 * scale)
-    check.move(to: NSPoint(x: 23 * scale, y: 34 * scale))
-    check.line(to: NSPoint(x: 28 * scale, y: 29 * scale))
-    check.line(to: NSPoint(x: 36 * scale, y: 40 * scale))
+    check.lineWidth = strokeWidth
+    check.move(to: NSPoint(x: 38 * scale, y: 50 * scale))
+    check.line(to: NSPoint(x: 47 * scale, y: 41 * scale))
+    check.line(to: NSPoint(x: 63 * scale, y: 60 * scale))
     check.stroke()
     NSGraphicsContext.restoreGraphicsState()
 

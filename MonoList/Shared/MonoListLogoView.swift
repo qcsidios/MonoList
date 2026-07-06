@@ -7,48 +7,38 @@ struct MonoListLogoView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
-                .fill(.black)
+                .fill(.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
+                        .stroke(Color.black.opacity(0.16), lineWidth: 0.5)
+                )
 
             Canvas { context, canvasSize in
                 let scale = canvasSize.width / 100
                 let lineWidth = 5.2 * scale
-                let radius = 11.5 * scale
-                let circleX = 29 * scale
-                let firstY = 34 * scale
-                let secondY = 66 * scale
-
-                for y in [firstY, secondY] {
-                    let circleRect = CGRect(
-                        x: circleX - radius,
-                        y: y - radius,
-                        width: radius * 2,
-                        height: radius * 2
-                    )
-                    context.stroke(
-                        Path(ellipseIn: circleRect),
-                        with: .color(.white),
-                        lineWidth: lineWidth
-                    )
-
-                    var line = Path()
-                    line.move(to: CGPoint(x: 51 * scale, y: y))
-                    line.addLine(to: CGPoint(x: 79 * scale, y: y))
-                    context.stroke(
-                        line,
-                        with: .color(.white),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
-                }
+                let radius = 22 * scale
+                let center = CGPoint(x: 50 * scale, y: 50 * scale)
+                let circleRect = CGRect(
+                    x: center.x - radius,
+                    y: center.y - radius,
+                    width: radius * 2,
+                    height: radius * 2
+                )
+                context.stroke(
+                    Path(ellipseIn: circleRect),
+                    with: .color(.black),
+                    lineWidth: lineWidth
+                )
 
                 var check = Path()
-                check.move(to: CGPoint(x: 23 * scale, y: 66 * scale))
-                check.addLine(to: CGPoint(x: 28 * scale, y: 71 * scale))
-                check.addLine(to: CGPoint(x: 36 * scale, y: 60 * scale))
+                check.move(to: CGPoint(x: 38 * scale, y: 50 * scale))
+                check.addLine(to: CGPoint(x: 47 * scale, y: 59 * scale))
+                check.addLine(to: CGPoint(x: 63 * scale, y: 40 * scale))
                 context.stroke(
                     check,
-                    with: .color(.white),
+                    with: .color(.black),
                     style: StrokeStyle(
-                        lineWidth: 3.8 * scale,
+                        lineWidth: lineWidth,
                         lineCap: .round,
                         lineJoin: .round
                     )

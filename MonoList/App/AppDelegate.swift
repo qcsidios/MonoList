@@ -57,7 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             onTestReminder: { [weak self] in
-                self?.showReminder(testing: true)
+                guard let self else { return }
+                if self.reminderPanelController?.isTesting == true {
+                    self.reminderPanelController?.close()
+                } else {
+                    self.showReminder(testing: true)
+                }
             }
         )
 
@@ -206,6 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             tasks: tasks,
             position: settings.reminderPosition.supportedValue,
             menuBarButton: statusItem?.button,
+            testing: testing,
             onOpen: { [weak self] in
                 guard let button = self?.statusItem?.button else { return }
                 self?.windowCoordinator?.toggleMainPanel(relativeTo: button)

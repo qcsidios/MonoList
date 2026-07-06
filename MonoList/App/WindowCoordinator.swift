@@ -20,6 +20,8 @@ final class WindowCoordinator {
     private var mainPanel: MainPanel?
     private var globalOutsideClickMonitor: Any?
     private var localOutsideClickMonitor: Any?
+    private var mainPanelResizeAnimation: NSViewAnimation?
+    private var pendingResizeWorkItem: DispatchWorkItem?
     private weak var previousApplication: NSRunningApplication?
     private var settingsWindow: NSWindow?
     private var settings: AppSettings?
@@ -50,6 +52,18 @@ final class WindowCoordinator {
             height += 32 + CGFloat(todayCompletedCount + olderVisibleCount) * 42
         }
         return min(max(height, mainPanelMinimumHeight), mainPanelMaximumHeight)
+    }
+
+    static func mainPanelFrame(
+        keepingTopOf frame: NSRect,
+        height: CGFloat
+    ) -> NSRect {
+        NSRect(
+            x: frame.minX,
+            y: frame.maxY - height,
+            width: frame.width,
+            height: height
+        )
     }
 
     func configureSettings(
@@ -128,6 +142,13 @@ final class WindowCoordinator {
 
     func closeMainPanel(restoringFocus: Bool = false) {
         removeOutsideClickMonitor()
+        if draftState.isPresented {
+            try? draftState.commitOrDismiss(to: taskStore)
+        }
+        pendingResizeWorkItem?.cancel()
+        pendingResizeWorkItem = nil
+        mainPanelResizeAnimation?.stop()
+        mainPanelResizeAnimation = nil
         mainPanel?.orderOut(nil)
         mainPanel = nil
 
@@ -223,7 +244,7 @@ final class WindowCoordinator {
         panel.onCancel = { [weak self] in
             self?.closeMainPanel(restoringFocus: true)
         }
-        panel.contentView = MainPanelHostingView(
+        let hostingView = MainPanelHostingView(
             rootView: TaskListView(
                 store: taskStore,
                 draftState: draftState,
@@ -240,6 +261,16 @@ final class WindowCoordinator {
                 }
             )
         )
+        panel.contentView = hostingView
+        panel.setContentSize(
+            NSSize(
+                width: Self.mainPanelWidth,
+                height: min(
+                    max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight),
+                    Self.mainPanelMaximumHeight
+                )
+            )
+        )
         return panel
     }
 
@@ -248,15 +279,35 @@ final class WindowCoordinator {
             max(height, Self.mainPanelMinimumHeight),
             Self.mainPanelMaximumHeight
         )
-        guard abs(panel.frame.height - clampedHeight) > 0.5 else { return }
-        var frame = panel.frame
-        frame.origin.y += frame.height - clampedHeight
-        frame.size.height = clampedHeight
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.20
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(frame, display: true)
+        pendingResizeWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self, weak panel] in
+            guard let self, let panel, self.mainPanel === panel else { return }
+            self.performMainPanelResize(panel, to: clampedHeight)
         }
+        pendingResizeWorkItem = workItem
+        DispatchQueue.main.async(execute: workItem)
+    }
+
+    private func performMainPanelResize(_ panel: NSPanel, to height: CGFloat) {
+        mainPanelResizeAnimation?.stop()
+        mainPanelResizeAnimation = nil
+        let currentFrame = panel.frame
+        guard abs(currentFrame.height - height) > 0.5 else { return }
+        let targetFrame = Self.mainPanelFrame(
+            keepingTopOf: currentFrame,
+            height: height
+        )
+        let animation = NSViewAnimation(
+            viewAnimations: [[
+                .target: panel,
+                .endFrame: NSValue(rect: targetFrame),
+            ]]
+        )
+        animation.duration = 0.22
+        animation.animationCurve = .easeInOut
+        animation.animationBlockingMode = .nonblocking
+        mainPanelResizeAnimation = animation
+        animation.start()
     }
 
     private func rememberFrontmostApplication() {

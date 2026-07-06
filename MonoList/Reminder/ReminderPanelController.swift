@@ -1,16 +1,32 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
-final class ReminderPanelController {
+final class ReminderPanelController: ObservableObject {
+    @Published private(set) var isTesting = false
+
     private var panel: NSPanel?
     private var countdownTimer: Timer?
     private var remainingTenths = 30
     private var model: ReminderPresentationModel?
     private var onClose: (() -> Void)?
+    private var finalFrame: NSRect?
+    private var position = ReminderPosition.topCenter
+    private var frameAnimation: NSViewAnimation?
+    private var isClosing = false
+    private let playSound: () -> Void
 
     var isVisible: Bool {
         panel?.isVisible == true
+    }
+
+    init(
+        playSound: @escaping () -> Void = {
+            NSSound(named: NSSound.Name("Ping"))?.play()
+        }
+    ) {
+        self.playSound = playSound
     }
 
     static func tasksForTest(_ tasks: [TaskItem], at date: Date = Date()) -> [TaskItem] {
@@ -32,10 +48,11 @@ final class ReminderPanelController {
         tasks: [TaskItem],
         position: ReminderPosition,
         menuBarButton: NSStatusBarButton?,
+        testing: Bool = false,
         onOpen: @escaping () -> Void,
         onClose: @escaping () -> Void
     ) {
-        close(notifying: false)
+        close(animated: false, notifying: false)
         guard !tasks.isEmpty else {
             onClose()
             return
@@ -82,13 +99,28 @@ final class ReminderPanelController {
             visibleFrame: screen.visibleFrame,
             menuBarButton: menuBarButton
         )
-        panel.setFrame(frame, display: false)
+        let supportedPosition = position.supportedValue
+        let compactFrame = Self.compactFrame(
+            for: frame,
+            position: supportedPosition
+        )
+        panel.setFrame(compactFrame, display: false)
         panel.orderFrontRegardless()
 
         self.panel = panel
         self.model = model
         self.onClose = onClose
+        self.finalFrame = frame
+        self.position = supportedPosition
+        isTesting = testing
+        isClosing = false
         remainingTenths = 30
+        playSound()
+        DispatchQueue.main.async { [weak self, weak panel] in
+            guard let self, let panel, self.panel === panel else { return }
+            model.isExpanded = true
+            self.animate(panel: panel, to: frame, duration: 0.32)
+        }
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) {
             [weak self] _ in
             Task { @MainActor in
@@ -97,19 +129,63 @@ final class ReminderPanelController {
         }
     }
 
-    func close(notifying: Bool = true) {
+    func close(animated: Bool = true, notifying: Bool = true) {
+        guard let panel else {
+            isTesting = false
+            if notifying {
+                let callback = onClose
+                onClose = nil
+                callback?()
+            } else {
+                onClose = nil
+            }
+            return
+        }
+        if isClosing && animated {
+            return
+        }
+        isClosing = true
         countdownTimer?.invalidate()
         countdownTimer = nil
-        panel?.orderOut(nil)
-        panel = nil
-        model = nil
-        if notifying {
-            let callback = onClose
-            onClose = nil
-            callback?()
-        } else {
-            onClose = nil
+        isTesting = false
+        frameAnimation?.stop()
+        frameAnimation = nil
+
+        guard animated, let finalFrame else {
+            finishClosing(panel: panel, notifying: notifying)
+            return
         }
+        model?.isExpanded = false
+        let compactFrame = Self.compactFrame(
+            for: finalFrame,
+            position: position
+        )
+        animate(panel: panel, to: compactFrame, duration: 0.24)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+            [weak self, weak panel] in
+            guard let self, let panel, self.panel === panel else { return }
+            self.finishClosing(panel: panel, notifying: notifying)
+        }
+    }
+
+    static func compactFrame(
+        for finalFrame: NSRect,
+        position: ReminderPosition
+    ) -> NSRect {
+        let size = NSSize(width: 36, height: 36)
+        let x: CGFloat
+        switch position.supportedValue {
+        case .topRight:
+            x = finalFrame.maxX - size.width
+        default:
+            x = finalFrame.midX - size.width / 2
+        }
+        return NSRect(
+            x: x,
+            y: finalFrame.maxY - size.height,
+            width: size.width,
+            height: size.height
+        )
     }
 
     private func countDown() {
@@ -120,6 +196,42 @@ final class ReminderPanelController {
         model?.remainingSeconds = max(0, Int(ceil(Double(remainingTenths) / 10)))
         if remainingTenths <= 0 {
             close()
+        }
+    }
+
+    private func animate(
+        panel: NSPanel,
+        to frame: NSRect,
+        duration: TimeInterval
+    ) {
+        frameAnimation?.stop()
+        let animation = NSViewAnimation(
+            viewAnimations: [[
+                .target: panel,
+                .endFrame: NSValue(rect: frame),
+            ]]
+        )
+        animation.duration = duration
+        animation.animationCurve = .easeInOut
+        animation.animationBlockingMode = .nonblocking
+        frameAnimation = animation
+        animation.start()
+    }
+
+    private func finishClosing(panel: NSPanel, notifying: Bool) {
+        frameAnimation?.stop()
+        frameAnimation = nil
+        panel.orderOut(nil)
+        self.panel = nil
+        model = nil
+        finalFrame = nil
+        isClosing = false
+        if notifying {
+            let callback = onClose
+            onClose = nil
+            callback?()
+        } else {
+            onClose = nil
         }
     }
 

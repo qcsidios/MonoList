@@ -277,16 +277,25 @@ private struct FixedQuietButtonStyle: ButtonStyle {
 
 private struct SettingsMenuLabel: View {
     let text: String
+    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack {
             Text(text)
             Spacer(minLength: 0)
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 8, weight: .semibold))
         }
+        .font(.system(size: 11, weight: .medium))
         .foregroundStyle(.primary)
         .padding(.horizontal, 9)
         .frame(maxWidth: .infinity, minHeight: 26)
+        .background(
+            Color.primary.opacity(isHovered ? 0.10 : 0.055),
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+        .onHover { isHovered = $0 }
     }
 }

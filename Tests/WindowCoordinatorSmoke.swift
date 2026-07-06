@@ -14,6 +14,19 @@ struct WindowCoordinatorSmoke {
         precondition(WindowCoordinator.mainPanelWidth == 336)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 480)
         precondition(WindowCoordinator.settingsWindowWidth == 430)
+        let originalFrame = NSRect(x: 120, y: 300, width: 336, height: 180)
+        let expandedFrame = WindowCoordinator.mainPanelFrame(
+            keepingTopOf: originalFrame,
+            height: 260
+        )
+        precondition(expandedFrame.minY == 220)
+        precondition(expandedFrame.maxY == originalFrame.maxY)
+        precondition(expandedFrame.width == originalFrame.width)
+        let collapsedFrame = WindowCoordinator.mainPanelFrame(
+            keepingTopOf: expandedFrame,
+            height: 120
+        )
+        precondition(collapsedFrame.maxY == originalFrame.maxY)
         precondition(!WindowCoordinator.requiresScrolling(contentHeight: 479))
         precondition(WindowCoordinator.requiresScrolling(contentHeight: 481))
         precondition(
@@ -47,8 +60,13 @@ struct WindowCoordinatorSmoke {
         precondition(!draft.isPresented)
         draft.present(after: nil)
         draft.text = "保留的草稿"
-        draft.dismissIfEmpty()
-        precondition(draft.isPresented)
+        try draft.commitOrDismiss(to: store)
+        precondition(store.pendingTasks.map(\.text) == ["还没有按回车", "保留的草稿"])
+        precondition(!draft.isPresented)
+        draft.present(after: store.pendingTasks.last?.id)
+        try draft.commitOrDismiss(to: store)
+        precondition(store.pendingTasks.count == 2)
+        precondition(!draft.isPresented)
         coordinator.showMainPanel(at: NSPoint(x: 500, y: 500))
         precondition(coordinator.isMainPanelVisible)
         coordinator.closeMainPanel()
