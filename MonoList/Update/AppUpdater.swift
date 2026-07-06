@@ -18,6 +18,9 @@ final class AppUpdater: ObservableObject {
     static let latestReleaseURL = URL(
         string: "https://api.github.com/repos/\(repository)/releases/latest"
     )!
+    static let latestReleasePageURL = URL(
+        string: "https://github.com/\(repository)/releases/latest"
+    )!
     static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
 
     @Published private(set) var statusText = ""
@@ -73,6 +76,14 @@ final class AppUpdater: ObservableObject {
     }
 
     func checkForUpdate() async -> AppUpdateCheckResult {
+        let apiResult = await checkGitHubAPI()
+        guard case .failed = apiResult else {
+            return apiResult
+        }
+        return await checkLatestReleasePage()
+    }
+
+    private func checkGitHubAPI() async -> AppUpdateCheckResult {
         do {
             var request = URLRequest(url: Self.latestReleaseURL)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -86,6 +97,41 @@ final class AppUpdater: ObservableObject {
                 return .failed("检测新版本失败")
             }
             return Self.parseRelease(data, currentVersion: currentVersion)
+        } catch {
+            return .failed("检测新版本失败")
+        }
+    }
+
+    private func checkLatestReleasePage() async -> AppUpdateCheckResult {
+        do {
+            var request = URLRequest(url: Self.latestReleasePageURL)
+            request.setValue("MonoList", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 12
+            let (_, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let responseURL = http.url else {
+                return .failed("检测新版本失败")
+            }
+            let result = Self.parseLatestReleaseURL(
+                responseURL,
+                currentVersion: currentVersion
+            )
+            guard case let .available(update) = result else {
+                return result
+            }
+
+            var assetRequest = URLRequest(url: update.dmgURL)
+            assetRequest.httpMethod = "HEAD"
+            assetRequest.setValue("MonoList", forHTTPHeaderField: "User-Agent")
+            assetRequest.timeoutInterval = 12
+            let (_, assetResponse) = try await session.data(for: assetRequest)
+            guard let assetHTTP = assetResponse as? HTTPURLResponse,
+                  (200..<300).contains(assetHTTP.statusCode),
+                  assetHTTP.url?.scheme == "https" else {
+                return .failed("更新包无效")
+            }
+            return result
         } catch {
             return .failed("检测新版本失败")
         }
@@ -130,6 +176,31 @@ final class AppUpdater: ObservableObject {
         } catch {
             return .failed("检测新版本失败")
         }
+    }
+
+    static func parseLatestReleaseURL(
+        _ url: URL,
+        currentVersion: String
+    ) -> AppUpdateCheckResult {
+        guard url.scheme == "https",
+              url.host == "github.com",
+              url.pathComponents.count >= 6,
+              url.pathComponents.suffix(3).dropLast() == ["releases", "tag"] else {
+            return .failed("检测新版本失败")
+        }
+        let tag = url.lastPathComponent
+        guard isValidVersionTag(tag) else {
+            return .failed("版本号无效")
+        }
+        guard compareVersions(tag, currentVersion) == .orderedDescending else {
+            return .upToDate
+        }
+        guard let dmgURL = URL(
+            string: "https://github.com/\(repository)/releases/download/\(tag)/MonoList-\(tag).dmg"
+        ) else {
+            return .failed("更新包无效")
+        }
+        return .available(AppUpdate(version: tag, dmgURL: dmgURL))
     }
 
     static func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {

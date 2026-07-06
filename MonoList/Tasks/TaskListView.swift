@@ -9,6 +9,24 @@ enum TaskInputSubmitTarget {
     case editing
 }
 
+@MainActor
+final class TaskInputRoutingState: ObservableObject {
+    var draftFocused = false
+    var isEditingTask = false
+
+    func submitTarget(
+        keyCode: UInt16,
+        hasMarkedText: Bool
+    ) -> TaskInputSubmitTarget {
+        TaskListView.submitTarget(
+            keyCode: keyCode,
+            hasMarkedText: hasMarkedText,
+            draftFocused: draftFocused,
+            isEditingTask: isEditingTask
+        )
+    }
+}
+
 struct TaskListView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var draftState: TaskDraftState
@@ -24,6 +42,7 @@ struct TaskListView: View {
     @State private var clearAction: ClearAction?
     @State private var currentDate = Date()
     @State private var submitEditingRequest = 0
+    @StateObject private var inputRoutingState = TaskInputRoutingState()
     @FocusState private var draftFocused: Bool
 
     private var todayCompleted: [TaskItem] {
@@ -279,6 +298,7 @@ struct TaskListView: View {
                 onSelect: { selectedTaskID = item.id },
                 onEditingChanged: { editing in
                     editingTaskID = editing ? item.id : nil
+                    inputRoutingState.isEditingTask = editing
                 },
                 submitRequest: submitEditingRequest
             )
@@ -322,6 +342,7 @@ struct TaskListView: View {
                     continueDraft()
                 }
                 .onChange(of: draftFocused) { oldValue, newValue in
+                    inputRoutingState.draftFocused = newValue
                     if oldValue && !newValue {
                         commitDraft()
                     }
@@ -474,11 +495,9 @@ struct TaskListView: View {
         guard keyboardMonitor == nil else { return }
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let editor = NSApp.keyWindow?.firstResponder as? NSTextView
-            switch Self.submitTarget(
+            switch inputRoutingState.submitTarget(
                 keyCode: event.keyCode,
-                hasMarkedText: editor?.hasMarkedText() == true,
-                draftFocused: draftFocused,
-                isEditingTask: editingTaskID != nil
+                hasMarkedText: editor?.hasMarkedText() == true
             ) {
             case .draft:
                 continueDraft()

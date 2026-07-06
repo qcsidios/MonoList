@@ -131,6 +131,19 @@ struct WindowCoordinatorSmoke {
                 isEditingTask: false
             ) == .none
         )
+        let routingState = TaskInputRoutingState()
+        precondition(
+            routingState.submitTarget(keyCode: 36, hasMarkedText: false) == .none
+        )
+        routingState.draftFocused = true
+        precondition(
+            routingState.submitTarget(keyCode: 36, hasMarkedText: false) == .draft
+        )
+        routingState.draftFocused = false
+        routingState.isEditingTask = true
+        precondition(
+            routingState.submitTarget(keyCode: 36, hasMarkedText: false) == .editing
+        )
 
         let draft = TaskDraftState()
         draft.syncVisibility(hasPendingTasks: false)

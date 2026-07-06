@@ -9,6 +9,18 @@ struct AppUpdaterSmoke {
         precondition(AppUpdater.isValidVersionTag("v0.1.0"))
         precondition(!AppUpdater.isValidVersionTag("1.0"))
         precondition(!AppUpdater.isValidVersionTag("v1.0.0-beta"))
+        let fallbackResult = AppUpdater.parseLatestReleaseURL(
+            URL(string: "https://github.com/qcsidios/MonoList/releases/tag/v0.4.6")!,
+            currentVersion: "0.4.5"
+        )
+        guard case let .available(fallbackUpdate) = fallbackResult else {
+            preconditionFailure("GitHub Release 跳转没有返回升级")
+        }
+        precondition(fallbackUpdate.version == "v0.4.6")
+        precondition(
+            fallbackUpdate.dmgURL.absoluteString ==
+                "https://github.com/qcsidios/MonoList/releases/download/v0.4.6/MonoList-v0.4.6.dmg"
+        )
 
         let validJSON = """
         {
