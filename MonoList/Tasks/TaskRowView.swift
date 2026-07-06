@@ -14,8 +14,9 @@ struct TaskRowView: View {
 
     @State private var text: String
     @State private var originalText: String
+    @State private var isEditingMode = false
     @State private var isHovered = false
-    @FocusState private var isEditing: Bool
+    @FocusState private var isEditorFocused: Bool
 
     init(
         item: TaskItem,
@@ -44,7 +45,7 @@ struct TaskRowView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 9) {
             Button {
                 onComplete(text)
             } label: {
@@ -57,24 +58,29 @@ struct TaskRowView: View {
             .help("标记为完成")
 
             Group {
-                if isEditing {
+                if isEditingMode {
                     TextField("待办内容", text: $text, axis: .vertical)
                         .textFieldStyle(.plain)
                         .lineLimit(1...6)
-                        .focused($isEditing)
+                        .focused($isEditorFocused)
+                        .onAppear {
+                            DispatchQueue.main.async {
+                                isEditorFocused = true
+                            }
+                        }
                         .onSubmit {
-                            saveIfNeeded()
-                            isEditing = false
+                            finishEditing()
                             onInsertAfter()
                         }
                 } else {
                     Text(text)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
-                            originalText = text
-                            isEditing = true
-                        }
+                        .highPriorityGesture(
+                            TapGesture(count: 2).onEnded {
+                                beginEditing()
+                            }
+                        )
                 }
             }
             .padding(.vertical, 5)
@@ -88,20 +94,24 @@ struct TaskRowView: View {
             .buttonStyle(.plain)
             .help("删除")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
         .background(
-            isSelected && !isEditing ? Color.primary.opacity(0.06) : .clear,
+            isSelected && !isEditingMode ? Color.primary.opacity(0.055) : .clear,
             in: RoundedRectangle(cornerRadius: 9)
         )
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded(onSelect))
         .onHover { isHovered = $0 }
-        .onChange(of: isEditing) { oldValue, newValue in
-            if oldValue && !newValue {
-                saveIfNeeded()
+        .onChange(of: isEditorFocused) { oldValue, newValue in
+            if oldValue && !newValue && isEditingMode {
+                finishEditing()
             }
-            onEditingChanged(newValue)
+        }
+        .onChange(of: isSelected) { _, newValue in
+            if !newValue && isEditingMode {
+                isEditorFocused = false
+            }
         }
         .contextMenu {
             Button("上移", action: onMoveUp)
@@ -109,6 +119,20 @@ struct TaskRowView: View {
             Divider()
             Button("删除", role: .destructive, action: onDelete)
         }
+    }
+
+    private func beginEditing() {
+        originalText = text
+        onSelect()
+        isEditingMode = true
+        onEditingChanged(true)
+    }
+
+    private func finishEditing() {
+        saveIfNeeded()
+        isEditorFocused = false
+        isEditingMode = false
+        onEditingChanged(false)
     }
 
     private func saveIfNeeded() {

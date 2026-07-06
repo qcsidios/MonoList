@@ -13,6 +13,21 @@ final class ReminderPanelController {
         panel?.isVisible == true
     }
 
+    static func tasksForTest(_ tasks: [TaskItem], at date: Date = Date()) -> [TaskItem] {
+        guard tasks.isEmpty else { return tasks }
+        return [
+            TaskItem(
+                id: UUID(),
+                text: "这是一次轻提醒测试",
+                status: .pending,
+                order: 0,
+                createdAt: date,
+                updatedAt: date,
+                completedAt: nil
+            )
+        ]
+    }
+
     func show(
         tasks: [TaskItem],
         position: ReminderPosition,

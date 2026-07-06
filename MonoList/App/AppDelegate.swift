@@ -8,7 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowCoordinator: WindowCoordinator?
     private var appSettings: AppSettings?
     private var loginItemController: LoginItemController?
-    private var shortcutController: GlobalShortcutController?
     private var reminderScheduler: ReminderScheduler?
     private var reminderPanelController: ReminderPanelController?
     private var appUpdater: AppUpdater?
@@ -18,7 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.applicationIconImage = MonoListLogoRenderer.makeImage(size: 512)
 
         let applicationSupportURL = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -34,7 +32,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.launchAtLogin && loginController.status != .enabled {
             try? loginController.setEnabled(true)
         }
-        let shortcutController = GlobalShortcutController()
         let reminderPanelController = ReminderPanelController()
         let updater = AppUpdater()
         let updateInstaller = UpdateInstaller()
@@ -42,7 +39,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.configureSettings(
             settings: settings,
             loginItemController: loginController,
-            shortcutController: shortcutController,
             updater: updater,
             onInstallUpdate: { [weak self] update in
                 Task { @MainActor in
@@ -59,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         }
                     }
                 }
+            },
+            onTestReminder: { [weak self] in
+                self?.showReminder(testing: true)
             }
         )
 
@@ -80,20 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         taskStore = store
         appSettings = settings
         loginItemController = loginController
-        self.shortcutController = shortcutController
         self.reminderPanelController = reminderPanelController
         appUpdater = updater
         self.updateInstaller = updateInstaller
         windowCoordinator = coordinator
         statusItem = item
-
-        shortcutController.onTriggered = { [weak self] in
-            guard let button = self?.statusItem?.button else {
-                return
-            }
-            self?.windowCoordinator?.toggleMainPanel(relativeTo: button)
-        }
-        try? shortcutController.register(settings.globalShortcut)
 
         coordinator.onWillShowMainPanel = { [weak reminderPanelController] in
             reminderPanelController?.close()
@@ -199,25 +189,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    private func showReminder() {
-        guard let tasks = taskStore?.pendingTasks,
-              !tasks.isEmpty,
+    private func showReminder(testing: Bool = false) {
+        guard let pendingTasks = taskStore?.pendingTasks,
               let settings = appSettings else {
+            reminderScheduler?.reminderClosed(pendingCount: 0)
+            return
+        }
+        let tasks = testing
+            ? ReminderPanelController.tasksForTest(pendingTasks)
+            : pendingTasks
+        guard !tasks.isEmpty else {
             reminderScheduler?.reminderClosed(pendingCount: 0)
             return
         }
         reminderPanelController?.show(
             tasks: tasks,
-            position: settings.reminderPosition,
+            position: settings.reminderPosition.supportedValue,
             menuBarButton: statusItem?.button,
             onOpen: { [weak self] in
                 guard let button = self?.statusItem?.button else { return }
                 self?.windowCoordinator?.toggleMainPanel(relativeTo: button)
             },
             onClose: { [weak self] in
-                self?.reminderScheduler?.reminderClosed(
-                    pendingCount: self?.taskStore?.pendingTasks.count ?? 0
-                )
+                if !testing {
+                    self?.reminderScheduler?.reminderClosed(
+                        pendingCount: self?.taskStore?.pendingTasks.count ?? 0
+                    )
+                }
             }
         )
     }

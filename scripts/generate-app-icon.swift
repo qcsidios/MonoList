@@ -53,9 +53,9 @@ for variant in variants {
 
     NSColor.black.setFill()
     NSBezierPath(
-        roundedRect: fullRect.insetBy(dx: 4 * scale, dy: 4 * scale),
-        xRadius: 23 * scale,
-        yRadius: 23 * scale
+        roundedRect: fullRect.insetBy(dx: 10 * scale, dy: 10 * scale),
+        xRadius: 21 * scale,
+        yRadius: 21 * scale
     ).fill()
 
     let strokeWidth = max(1, 5.2 * scale)

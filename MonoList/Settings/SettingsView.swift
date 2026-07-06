@@ -1,17 +1,14 @@
 import AppKit
-import Carbon
 import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var loginItemController: LoginItemController
-    @ObservedObject var shortcutController: GlobalShortcutController
     @ObservedObject var updater: AppUpdater
     let onInstallUpdate: (AppUpdate) -> Void
+    let onTestReminder: () -> Void
 
     @State private var errorMessage: String?
-    @State private var shortcutMonitor: Any?
-    @State private var isRecordingShortcut = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,17 +16,13 @@ struct SettingsView: View {
             SettingsCard(title: "轻提醒", systemImage: "bell") {
                 reminderSettings
             }
-            SettingsCard(title: "开机启动", systemImage: "power") {
+            SettingsCard(title: "启动", systemImage: "power") {
                 startupSettings
             }
-            SettingsCard(title: "全局快捷键", systemImage: "keyboard") {
-                shortcutSettings
-            }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 20)
-        .frame(width: 480, height: 560)
+        .padding(16)
+        .frame(width: WindowCoordinator.settingsWindowWidth)
+        .fixedSize(horizontal: false, vertical: true)
         .background(Color(nsColor: .windowBackgroundColor))
         .alert(
             "操作失败",
@@ -42,49 +35,53 @@ struct SettingsView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-        .onDisappear {
-            stopShortcutRecording()
-        }
     }
 
     private var softwareInformation: some View {
-        HStack(spacing: 14) {
-            MonoListLogoView(size: 52)
-            VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 12) {
+            MonoListLogoView(size: 46)
+            VStack(alignment: .leading, spacing: 4) {
                 Text("MonoList 一栏")
-                    .font(.system(size: 24, weight: .semibold))
-                HStack(spacing: 9) {
+                    .font(.system(size: 20, weight: .semibold))
+                HStack(spacing: 7) {
                     Text("版本 \(appVersion)")
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Button(updater.isChecking ? "正在检测…" : "检测新版本") {
+                    Button("检测新版本") {
                         Task {
                             await updater.check(manual: true, settings: settings)
                         }
                     }
                     .buttonStyle(QuietButtonStyle())
                     .disabled(updater.isChecking)
-                    if let update = updater.availableUpdate {
-                        Button("升级到 \(update.version)") {
-                            onInstallUpdate(update)
+
+                    if updater.isChecking {
+                        Text("正在检测…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if !updater.statusText.isEmpty {
+                            Text(updater.statusText)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
-                        .buttonStyle(QuietButtonStyle())
+                        if let update = updater.availableUpdate {
+                            Button("升级到 \(update.version)") {
+                                onInstallUpdate(update)
+                            }
+                            .buttonStyle(QuietButtonStyle())
+                        }
                     }
                 }
-                if !updater.statusText.isEmpty {
-                    Text(updater.statusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
-        .frame(minHeight: 64)
+        .frame(minHeight: 52)
     }
 
     private var reminderSettings: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             settingsRow("启用轻提醒") {
                 Toggle(
                     "",
@@ -96,42 +93,64 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
             }
-            Divider().opacity(0.5)
+            Divider().opacity(0.4)
             settingsRow("提醒间隔") {
-                Picker(
-                    "",
-                    selection: binding(
-                        get: { settings.reminderIntervalMinutes },
-                        update: { $0.reminderIntervalMinutes = $1 }
-                    )
-                ) {
-                    ForEach([30, 60, 90, 120], id: \.self) {
-                        Text("\($0) 分钟").tag($0)
+                Menu {
+                    ForEach([30, 60, 90, 120], id: \.self) { interval in
+                        Button("\(interval) 分钟") {
+                            updateSettings {
+                                $0.reminderIntervalMinutes = interval
+                            }
+                        }
                     }
+                } label: {
+                    SettingsMenuLabel(text: "\(settings.reminderIntervalMinutes) 分钟")
                 }
-                .labelsHidden()
-                .frame(width: 116)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 116, height: 26)
+                .background(
+                    Color.primary.opacity(0.055),
+                    in: RoundedRectangle(cornerRadius: 6)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
             }
             settingsRow("提醒位置") {
-                Picker(
-                    "",
-                    selection: binding(
-                        get: { settings.reminderPosition },
-                        update: { $0.reminderPosition = $1 }
-                    )
-                ) {
-                    ForEach(ReminderPosition.allCases) {
-                        Text($0.title).tag($0)
+                Menu {
+                    ForEach(ReminderPosition.supportedCases) { position in
+                        Button(position.title) {
+                            updateSettings {
+                                $0.reminderPosition = position
+                            }
+                        }
                     }
+                } label: {
+                    SettingsMenuLabel(text: settings.reminderPosition.title)
                 }
-                .labelsHidden()
-                .frame(width: 116)
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 116, height: 26)
+                .background(
+                    Color.primary.opacity(0.055),
+                    in: RoundedRectangle(cornerRadius: 6)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+            }
+            settingsRow("提醒测试") {
+                Button("立即测试", action: onTestReminder)
+                    .buttonStyle(FixedQuietButtonStyle(width: 116))
             }
         }
     }
 
     private var startupSettings: some View {
-        settingsRow("登录后自动启动") {
+        settingsRow("开机后自动启动") {
             Toggle(
                 "",
                 isOn: Binding(
@@ -151,29 +170,6 @@ struct SettingsView: View {
         }
     }
 
-    private var shortcutSettings: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(shortcutDescription)
-                    .foregroundStyle(settings.globalShortcut == nil ? .secondary : .primary)
-                Text("用于随时打开或关闭待办窗口")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer()
-            Button(isRecordingShortcut ? "请按快捷键…" : "录入快捷键") {
-                isRecordingShortcut ? stopShortcutRecording() : startShortcutRecording()
-            }
-            .buttonStyle(QuietButtonStyle())
-            if settings.globalShortcut != nil {
-                Button("清除") {
-                    saveShortcut(nil)
-                }
-                .buttonStyle(QuietButtonStyle())
-            }
-        }
-    }
-
     private func settingsRow<Content: View>(
         _ title: String,
         @ViewBuilder content: () -> Content
@@ -183,42 +179,12 @@ struct SettingsView: View {
             Spacer()
             content()
         }
-        .frame(minHeight: 26)
+        .frame(minHeight: 28)
     }
 
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
-            as? String ?? "0.2.0"
-    }
-
-    private var shortcutDescription: String {
-        guard let shortcut = settings.globalShortcut else {
-            return "未设置"
-        }
-        return "\(modifierText(shortcut.modifiers))\(keyText(shortcut.keyCode))"
-    }
-
-    private func modifierText(_ modifiers: UInt32) -> String {
-        var value = ""
-        if modifiers & UInt32(controlKey) != 0 { value += "⌃" }
-        if modifiers & UInt32(optionKey) != 0 { value += "⌥" }
-        if modifiers & UInt32(shiftKey) != 0 { value += "⇧" }
-        if modifiers & UInt32(cmdKey) != 0 { value += "⌘" }
-        return value
-    }
-
-    private func keyText(_ keyCode: UInt32) -> String {
-        let keys: [UInt32: String] = [
-            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G",
-            6: "Z", 7: "X", 8: "C", 9: "V", 11: "B",
-            12: "Q", 13: "W", 14: "E", 15: "R", 16: "Y", 17: "T",
-            18: "1", 19: "2", 20: "3", 21: "4", 22: "6", 23: "5",
-            25: "9", 26: "7", 28: "8", 29: "0",
-            31: "O", 32: "U", 34: "I", 35: "P",
-            37: "L", 38: "J", 40: "K", 45: "N", 46: "M",
-            36: "↩", 49: "Space", 51: "⌫",
-        ]
-        return keys[keyCode] ?? "Key \(keyCode)"
+            as? String ?? "0.3.0"
     }
 
     private func binding<Value>(
@@ -237,52 +203,12 @@ struct SettingsView: View {
         )
     }
 
-    private func startShortcutRecording() {
-        isRecordingShortcut = true
-        try? shortcutController.register(nil)
-        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let flags = carbonModifiers(for: event.modifierFlags)
-            guard flags != 0 else { return event }
-            saveShortcut(
-                ShortcutDefinition(
-                    keyCode: UInt32(event.keyCode),
-                    modifiers: flags
-                )
-            )
-            stopShortcutRecording()
-            return nil
-        }
-    }
-
-    private func stopShortcutRecording() {
-        if let shortcutMonitor {
-            NSEvent.removeMonitor(shortcutMonitor)
-            self.shortcutMonitor = nil
-        }
-        isRecordingShortcut = false
-        if shortcutController.registeredShortcut == nil {
-            try? shortcutController.register(settings.globalShortcut)
-        }
-    }
-
-    private func saveShortcut(_ shortcut: ShortcutDefinition?) {
-        let oldShortcut = settings.globalShortcut
+    private func updateSettings(_ mutation: (inout SettingsValues) -> Void) {
         do {
-            try shortcutController.register(shortcut)
-            try settings.update { $0.globalShortcut = shortcut }
+            try settings.update(mutation)
         } catch {
-            try? shortcutController.register(oldShortcut)
             errorMessage = error.localizedDescription
         }
-    }
-
-    private func carbonModifiers(for flags: NSEvent.ModifierFlags) -> UInt32 {
-        var result: UInt32 = 0
-        if flags.contains(.command) { result |= UInt32(cmdKey) }
-        if flags.contains(.option) { result |= UInt32(optionKey) }
-        if flags.contains(.control) { result |= UInt32(controlKey) }
-        if flags.contains(.shift) { result |= UInt32(shiftKey) }
-        return result
     }
 }
 
@@ -302,15 +228,15 @@ private struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: systemImage)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
             content
         }
-        .padding(15)
+        .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
     }
 }
 
@@ -318,15 +244,49 @@ private struct QuietButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 9)
-            .frame(height: 25)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
             .background(
-                Color.primary.opacity(configuration.isPressed ? 0.11 : 0.055),
+                Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
                 in: RoundedRectangle(cornerRadius: 6)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.primary.opacity(0.09), lineWidth: 0.5)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
             )
+    }
+}
+
+private struct FixedQuietButtonStyle: ButtonStyle {
+    let width: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .medium))
+            .frame(width: width, height: 26)
+            .background(
+                Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
+                in: RoundedRectangle(cornerRadius: 6)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
+    }
+}
+
+private struct SettingsMenuLabel: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(text)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 8, weight: .semibold))
+        }
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, minHeight: 26)
     }
 }

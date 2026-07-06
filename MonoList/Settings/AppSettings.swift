@@ -23,6 +23,17 @@ enum ReminderPosition: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    static let supportedCases: [ReminderPosition] = [.topCenter, .topRight]
+
+    var supportedValue: ReminderPosition {
+        switch self {
+        case .topCenter, .topRight:
+            return self
+        case .center, .belowMenuBar:
+            return .topCenter
+        }
+    }
+
     var title: String {
         switch self {
         case .center:
@@ -45,8 +56,8 @@ struct ShortcutDefinition: Codable, Equatable {
 struct SettingsValues: Codable, Equatable {
     var reminderEnabled = true
     var reminderIntervalMinutes = 60
-    var reminderPosition = ReminderPosition.center
-    var launchAtLogin = true
+    var reminderPosition = ReminderPosition.topCenter
+    var launchAtLogin = false
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
 }
@@ -91,6 +102,7 @@ final class AppSettings: ObservableObject {
         }
         var candidate = values
         mutation(&candidate)
+        candidate.reminderPosition = candidate.reminderPosition.supportedValue
         guard [30, 60, 90, 120].contains(candidate.reminderIntervalMinutes) else {
             throw AppSettingsError.invalidReminderInterval
         }
@@ -117,7 +129,9 @@ final class AppSettings: ObservableObject {
             guard database.schemaVersion == SettingsDatabase.currentSchemaVersion else {
                 throw CocoaError(.coderInvalidValue)
             }
-            values = database.values
+            var loadedValues = database.values
+            loadedValues.reminderPosition = loadedValues.reminderPosition.supportedValue
+            values = loadedValues
         } catch {
             loadError = error
         }

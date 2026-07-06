@@ -9,6 +9,11 @@ mkdir -p "$BUILD_DIR"
 
 swiftc \
   -parse-as-library \
+  "$ROOT_DIR/MonoList/Tasks/TaskItem.swift" \
+  "$ROOT_DIR/MonoList/Settings/AppSettings.swift" \
+  "$ROOT_DIR/MonoList/Shared/AtomicFileWriter.swift" \
+  "$ROOT_DIR/MonoList/Reminder/ReminderView.swift" \
+  "$ROOT_DIR/MonoList/Reminder/ReminderPanelController.swift" \
   "$ROOT_DIR/MonoList/Reminder/ReminderScheduler.swift" \
   "$ROOT_DIR/Tests/ReminderSchedulerSmoke.swift" \
   -o "$TEST_EXECUTABLE"

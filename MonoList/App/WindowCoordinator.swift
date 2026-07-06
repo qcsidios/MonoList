@@ -3,10 +3,14 @@ import SwiftUI
 
 @MainActor
 final class WindowCoordinator {
-    static let mainPanelWidth: CGFloat = 360
-    static let mainPanelMinimumHeight: CGFloat = 148
-    static let mainPanelMaximumHeight: CGFloat = 520
-    static let settingsWindowSize = NSSize(width: 480, height: 560)
+    static let mainPanelWidth: CGFloat = 336
+    static let mainPanelMinimumHeight: CGFloat = 106
+    static let mainPanelMaximumHeight: CGFloat = 480
+    static let settingsWindowWidth: CGFloat = 430
+
+    static func requiresScrolling(contentHeight: CGFloat) -> Bool {
+        contentHeight > mainPanelMaximumHeight
+    }
 
     var onOpenSettings: (() -> Void)?
     var onWillShowMainPanel: (() -> Void)?
@@ -14,14 +18,15 @@ final class WindowCoordinator {
     private let taskStore: TaskStore
     private let draftState = TaskDraftState()
     private var mainPanel: MainPanel?
-    private var outsideClickMonitor: Any?
+    private var globalOutsideClickMonitor: Any?
+    private var localOutsideClickMonitor: Any?
     private weak var previousApplication: NSRunningApplication?
     private var settingsWindow: NSWindow?
     private var settings: AppSettings?
     private var loginItemController: LoginItemController?
-    private var shortcutController: GlobalShortcutController?
     private var updater: AppUpdater?
     private var onInstallUpdate: ((AppUpdate) -> Void)?
+    private var onTestReminder: (() -> Void)?
 
     var isMainPanelVisible: Bool {
         mainPanel?.isVisible == true
@@ -40,7 +45,7 @@ final class WindowCoordinator {
         todayCompletedCount: Int,
         olderVisibleCount: Int
     ) -> CGFloat {
-        var height: CGFloat = 122 + CGFloat(pendingCount) * 43
+        var height: CGFloat = 106 + CGFloat(pendingCount) * 43
         if todayCompletedCount + olderVisibleCount > 0 {
             height += 32 + CGFloat(todayCompletedCount + olderVisibleCount) * 42
         }
@@ -50,15 +55,15 @@ final class WindowCoordinator {
     func configureSettings(
         settings: AppSettings,
         loginItemController: LoginItemController,
-        shortcutController: GlobalShortcutController,
         updater: AppUpdater,
-        onInstallUpdate: @escaping (AppUpdate) -> Void
+        onInstallUpdate: @escaping (AppUpdate) -> Void,
+        onTestReminder: @escaping () -> Void
     ) {
         self.settings = settings
         self.loginItemController = loginItemController
-        self.shortcutController = shortcutController
         self.updater = updater
         self.onInstallUpdate = onInstallUpdate
+        self.onTestReminder = onTestReminder
         onOpenSettings = { [weak self] in
             self?.showSettings()
         }
@@ -82,6 +87,7 @@ final class WindowCoordinator {
         closeMainPanel()
         onWillShowMainPanel?()
         rememberFrontmostApplication()
+        draftState.syncVisibility(hasPendingTasks: !taskStore.pendingTasks.isEmpty)
 
         let panel = makeMainPanel()
         let screen = NSScreen.screens.first(where: { $0.frame.contains(anchor) }) ?? NSScreen.main
@@ -94,11 +100,30 @@ final class WindowCoordinator {
             visibleFrame.minY + 8,
             anchor.y - panel.frame.height - 6
         )
-        panel.setFrameOrigin(NSPoint(x: originX, y: originY))
-
+        let finalFrame = NSRect(
+            x: originX,
+            y: originY,
+            width: panel.frame.width,
+            height: panel.frame.height
+        )
+        var startFrame = finalFrame
+        startFrame.origin.y += 4
+        panel.setFrame(startFrame, display: false)
+        panel.alphaValue = 0
+        mainPanel = panel
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
-        mainPanel = panel
+        panel.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.20
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+            panel.animator().setFrame(finalFrame, display: true)
+        }
+        DispatchQueue.main.async { [weak self, weak panel] in
+            guard let self, let panel, self.mainPanel === panel else { return }
+            self.installOutsideClickMonitors(for: panel)
+        }
     }
 
     func closeMainPanel(restoringFocus: Bool = false) {
@@ -117,7 +142,6 @@ final class WindowCoordinator {
         closeMainPanel()
         guard let settings,
               let loginItemController,
-              let shortcutController,
               let updater else {
             return
         }
@@ -129,7 +153,12 @@ final class WindowCoordinator {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: Self.settingsWindowSize),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: Self.settingsWindowWidth,
+                height: 400
+            ),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -137,13 +166,20 @@ final class WindowCoordinator {
         window.title = "MonoList 控制台"
         window.center()
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(
+        let hostingView = NSHostingView(
             rootView: SettingsView(
                 settings: settings,
                 loginItemController: loginItemController,
-                shortcutController: shortcutController,
                 updater: updater,
-                onInstallUpdate: onInstallUpdate ?? { _ in }
+                onInstallUpdate: onInstallUpdate ?? { _ in },
+                onTestReminder: onTestReminder ?? {}
+            )
+        )
+        window.contentView = hostingView
+        window.setContentSize(
+            NSSize(
+                width: Self.settingsWindowWidth,
+                height: max(300, hostingView.fittingSize.height)
             )
         )
         settingsWindow = window
@@ -152,10 +188,13 @@ final class WindowCoordinator {
     }
 
     private func makeMainPanel() -> MainPanel {
-        let initialHeight = Self.preferredMainPanelHeight(
-            pendingCount: taskStore.pendingTasks.count,
-            todayCompletedCount: taskStore.completedTasks(on: Date()).count,
-            olderVisibleCount: 0
+        let initialHeight = max(
+            148,
+            Self.preferredMainPanelHeight(
+                pendingCount: taskStore.pendingTasks.count,
+                todayCompletedCount: taskStore.completedTasks(on: Date()).count,
+                olderVisibleCount: 0
+            )
         )
         let panel = MainPanel(
             contentRect: NSRect(
@@ -177,13 +216,14 @@ final class WindowCoordinator {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.hidesOnDeactivate = true
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = true
         panel.level = .floating
         panel.collectionBehavior = [.transient, .moveToActiveSpace]
         panel.onCancel = { [weak self] in
             self?.closeMainPanel(restoringFocus: true)
         }
-        panel.contentView = NSHostingView(
+        panel.contentView = MainPanelHostingView(
             rootView: TaskListView(
                 store: taskStore,
                 draftState: draftState,
@@ -212,7 +252,11 @@ final class WindowCoordinator {
         var frame = panel.frame
         frame.origin.y += frame.height - clampedHeight
         frame.size.height = clampedHeight
-        panel.setFrame(frame, display: true, animate: true)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.20
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(frame, display: true)
+        }
     }
 
     private func rememberFrontmostApplication() {
@@ -222,20 +266,34 @@ final class WindowCoordinator {
         }
     }
 
-    private func installOutsideClickMonitor() {
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+    private func installOutsideClickMonitors(for panel: NSPanel) {
+        removeOutsideClickMonitor()
+        globalOutsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.closeMainPanel()
             }
         }
+        localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self, weak panel] event in
+            guard let self, let panel else { return event }
+            if event.window !== panel && event.window?.level != .statusBar {
+                self.closeMainPanel()
+            }
+            return event
+        }
     }
 
     private func removeOutsideClickMonitor() {
-        if let outsideClickMonitor {
-            NSEvent.removeMonitor(outsideClickMonitor)
-            self.outsideClickMonitor = nil
+        if let globalOutsideClickMonitor {
+            NSEvent.removeMonitor(globalOutsideClickMonitor)
+            self.globalOutsideClickMonitor = nil
+        }
+        if let localOutsideClickMonitor {
+            NSEvent.removeMonitor(localOutsideClickMonitor)
+            self.localOutsideClickMonitor = nil
         }
     }
 }
@@ -250,5 +308,11 @@ private final class MainPanel: NSPanel {
 
     override func cancelOperation(_ sender: Any?) {
         onCancel?()
+    }
+}
+
+private final class MainPanelHostingView<Content: View>: NSHostingView<Content> {
+    override var mouseDownCanMoveWindow: Bool {
+        true
     }
 }

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum SmokeFailure: Error, CustomStringConvertible {
@@ -15,6 +16,7 @@ enum SmokeFailure: Error, CustomStringConvertible {
 struct AppLaunchSmoke {
     static func main() throws {
         let appURL = URL(fileURLWithPath: CommandLine.arguments[1])
+        let iconPNGURL = URL(fileURLWithPath: CommandLine.arguments[2])
         let contentsURL = appURL.appendingPathComponent("Contents")
         let executableURL = contentsURL.appendingPathComponent("MacOS/MonoList")
         let plistURL = contentsURL.appendingPathComponent("Info.plist")
@@ -44,8 +46,39 @@ struct AppLaunchSmoke {
                     "应用必须显示在 Dock，LSUIElement 不能为 true")
         try require(plist["LSMinimumSystemVersion"] as? String == "14.0",
                     "最低系统版本必须为 macOS 14.0")
+        try requireNormalIconSafeArea(iconPNGURL)
 
         print("App launch smoke passed.")
+    }
+
+    private static func requireNormalIconSafeArea(_ url: URL) throws {
+        guard let data = try? Data(contentsOf: url),
+              let image = NSBitmapImageRep(data: data) else {
+            throw SmokeFailure.failed("无法读取 AppIcon PNG")
+        }
+        var minX = image.pixelsWide
+        var maxX = 0
+        var minY = image.pixelsHigh
+        var maxY = 0
+        for y in 0..<image.pixelsHigh {
+            for x in 0..<image.pixelsWide
+            where image.colorAt(x: x, y: y)?.alphaComponent ?? 0 > 0.01 {
+                minX = min(minX, x)
+                maxX = max(maxX, x)
+                minY = min(minY, y)
+                maxY = max(maxY, y)
+            }
+        }
+        let occupiedWidth = maxX - minX + 1
+        let occupiedHeight = maxY - minY + 1
+        try require(
+            occupiedWidth <= 840 && occupiedHeight <= 840,
+            "Dock 图标安全边距不足"
+        )
+        try require(
+            occupiedWidth >= 780 && occupiedHeight >= 780,
+            "Dock 图标缩得过小"
+        )
     }
 
     private static func requireDirectory(_ url: URL, message: String) throws {

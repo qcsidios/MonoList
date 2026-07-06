@@ -31,20 +31,43 @@ struct TaskListView: View {
         showsOlderCompleted ? olderCompleted : []
     }
 
-    private var preferredHeight: CGFloat {
-        let baseHeight = WindowCoordinator.preferredMainPanelHeight(
-            pendingCount: store.pendingTasks.count,
-            todayCompletedCount: todayCompleted.count,
-            olderVisibleCount: visibleOlderCompleted.count
-        )
+    private var completedGroups: [CompletedGroup] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: visibleOlderCompleted) {
+            calendar.startOfDay(for: $0.completedAt ?? .distantPast)
+        }
+        return grouped
+            .map { CompletedGroup(date: $0.key, tasks: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+
+    private var naturalHeight: CGFloat {
         let visibleTasks = store.pendingTasks + todayCompleted + visibleOlderCompleted
-        let additionalLines = visibleTasks.reduce(0) {
+        let extraLines = visibleTasks.reduce(0) {
             $0 + estimatedAdditionalLines(for: $1.text)
         }
-        return min(
-            baseHeight + CGFloat(additionalLines) * 18,
+        let rows = store.pendingTasks.count +
+            todayCompleted.count +
+            visibleOlderCompleted.count +
+            (draftState.isPresented ? 1 : 0)
+        let dateHeaders = showsOlderCompleted ? completedGroups.count : 0
+        return 55 +
+            14 +
+            CGFloat(rows * 42) +
+            CGFloat(extraLines * 18) +
+            35 +
+            CGFloat(dateHeaders * 19)
+    }
+
+    private var preferredHeight: CGFloat {
+        min(
+            max(naturalHeight, WindowCoordinator.mainPanelMinimumHeight),
             WindowCoordinator.mainPanelMaximumHeight
         )
+    }
+
+    private var shouldScroll: Bool {
+        WindowCoordinator.requiresScrolling(contentHeight: naturalHeight)
     }
 
     var body: some View {
@@ -62,14 +85,20 @@ struct TaskListView: View {
         .frame(width: WindowCoordinator.mainPanelWidth, height: preferredHeight)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .clipShape(RoundedRectangle(cornerRadius: 14))
-        .animation(.easeInOut(duration: 0.24), value: preferredHeight)
         .onAppear {
+            draftState.syncVisibility(hasPendingTasks: !store.pendingTasks.isEmpty)
             installKeyboardMonitor()
             onHeightChanged(preferredHeight)
         }
-        .onDisappear(perform: removeKeyboardMonitor)
+        .onDisappear {
+            draftState.dismissIfEmpty()
+            removeKeyboardMonitor()
+        }
         .onChange(of: preferredHeight) { _, height in
             onHeightChanged(height)
+        }
+        .onChange(of: store.pendingTasks.count) { _, count in
+            draftState.syncVisibility(hasPendingTasks: count > 0)
         }
         .onReceive(
             Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -109,40 +138,64 @@ struct TaskListView: View {
     private var mainList: some View {
         VStack(spacing: 0) {
             header
-            Divider().opacity(0.55)
-            ScrollView {
-                LazyVStack(spacing: 3) {
-                    pendingRows
-                    if draftState.afterID == nil {
-                        draftRow
-                    }
-                    completedSection
-                    Color.clear
-                        .frame(maxWidth: .infinity, minHeight: 18)
-                        .contentShape(Rectangle())
-                        .onTapGesture(count: 2) {
-                            draftState.move(after: store.pendingTasks.last?.id)
-                            draftFocused = true
-                        }
+            Divider().opacity(0.45)
+            if shouldScroll {
+                ScrollView {
+                    taskContent
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
-                .frame(maxWidth: .infinity, minHeight: 76, alignment: .top)
-                .contentShape(Rectangle())
+            } else {
+                taskContent
             }
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("今天")
-                    .font(.system(size: 17, weight: .semibold))
-                Text(Date(), format: .dateTime.month().day().weekday())
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+    private var taskContent: some View {
+        ZStack {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    clearFocus()
+                }
+
+            VStack(spacing: 2) {
+                pendingRows
+                if draftState.isPresented && draftState.afterID == nil {
+                    draftRow
+                }
+                completedSection
             }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 7) {
+            Text("今天")
+                .font(.system(size: 17, weight: .semibold))
+            Text(currentDate, format: .dateTime.month().day().weekday())
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
             Spacer()
+
+            Button {
+                draftState.present(after: store.pendingTasks.last?.id)
+                DispatchQueue.main.async {
+                    draftFocused = true
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("新增待办")
+
             Menu {
                 Button("清空未完成任务") { clearAction = .pending }
                     .disabled(store.pendingTasks.isEmpty)
@@ -153,8 +206,11 @@ struct TaskListView: View {
                     .disabled(store.tasks.isEmpty)
             } label: {
                 Image(systemName: "ellipsis")
-                    .frame(width: 32, height: 32)
-                    .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -162,16 +218,19 @@ struct TaskListView: View {
             .help("更多操作")
 
             Button(action: onOpenSettings) {
-                Image(systemName: "slider.horizontal.3")
-                    .frame(width: 32, height: 32)
-                    .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+                Image(systemName: "gearshape")
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Color.primary.opacity(0.045),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
             }
             .buttonStyle(.plain)
             .help("打开控制台")
         }
         .padding(.leading, 14)
-        .padding(.trailing, 10)
-        .padding(.vertical, 9)
+        .padding(.trailing, 9)
+        .frame(height: 54)
     }
 
     @ViewBuilder
@@ -185,12 +244,19 @@ struct TaskListView: View {
                 onComplete: perform { text in
                     try store.complete(id: item.id, finalText: text)
                 },
-                onDelete: perform { try store.delete(id: item.id) },
+                onDelete: {
+                    performAction { try store.delete(id: item.id) }
+                    if selectedTaskID == item.id {
+                        selectedTaskID = nil
+                    }
+                },
                 onMoveUp: perform { try store.move(id: item.id, by: -1) },
                 onMoveDown: perform { try store.move(id: item.id, by: 1) },
                 onInsertAfter: {
-                    draftState.move(after: item.id)
-                    draftFocused = true
+                    draftState.present(after: item.id)
+                    DispatchQueue.main.async {
+                        draftFocused = true
+                    }
                 },
                 isSelected: selectedTaskID == item.id,
                 onSelect: { selectedTaskID = item.id },
@@ -210,14 +276,14 @@ struct TaskListView: View {
                 )
             )
 
-            if draftState.afterID == item.id {
+            if draftState.isPresented && draftState.afterID == item.id {
                 draftRow
             }
         }
     }
 
     private var draftRow: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 9) {
             Image(systemName: "circle")
                 .font(.system(size: 18))
                 .foregroundStyle(.tertiary)
@@ -226,10 +292,16 @@ struct TaskListView: View {
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
                 .focused($draftFocused)
+                .onAppear {
+                    if !store.pendingTasks.isEmpty {
+                        DispatchQueue.main.async {
+                            draftFocused = true
+                        }
+                    }
+                }
                 .onSubmit {
                     do {
                         _ = try draftState.submit(to: store)
-                        draftFocused = true
                     } catch {
                         errorMessage = error.localizedDescription
                     }
@@ -237,36 +309,35 @@ struct TaskListView: View {
                 .padding(.vertical, 5)
             Color.clear.frame(width: 28, height: 28)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Color.primary.opacity(0.03),
+            in: RoundedRectangle(cornerRadius: 9)
+        )
     }
 
-    @ViewBuilder
     private var completedSection: some View {
-        if !store.historyTasks.isEmpty {
+        VStack(spacing: 2) {
             HStack {
                 Text("已完成")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                if !olderCompleted.isEmpty {
-                    Button(showsOlderCompleted ? "隐藏" : "显示") {
-                        showsOlderCompleted.toggle()
-                    }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
-                    .padding(.horizontal, 10)
-                    .frame(height: 26)
-                    .background(Color.primary.opacity(0.06), in: Capsule())
+                Button(showsOlderCompleted ? "隐藏" : "显示") {
+                    showsOlderCompleted.toggle()
                 }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .medium))
+                .padding(.horizontal, 10)
+                .frame(height: 24)
+                .background(Color.primary.opacity(0.055), in: Capsule())
             }
-            .padding(.horizontal, 11)
-            .padding(.top, 8)
-            .padding(.bottom, 2)
+            .padding(.horizontal, 10)
+            .frame(height: 35)
 
             ForEach(todayCompleted) { item in
-                completedRow(item, showsDate: false)
+                completedRow(item)
             }
 
             if showsOlderCompleted {
@@ -275,33 +346,34 @@ struct TaskListView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 11)
-                        .padding(.top, 5)
+                        .padding(.horizontal, 10)
+                        .frame(height: 19)
                     ForEach(group.tasks) { item in
-                        completedRow(item, showsDate: false)
+                        completedRow(item)
                     }
                 }
             }
         }
     }
 
-    private func completedRow(_ item: TaskItem, showsDate: Bool) -> some View {
+    private func completedRow(_ item: TaskItem) -> some View {
         CompletedTaskRow(
             item: item,
-            showsDate: showsDate,
             onRestore: { performAction { try store.restore(id: item.id) } },
             onDelete: { performAction { try store.delete(id: item.id) } }
         )
     }
 
-    private var completedGroups: [CompletedGroup] {
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: olderCompleted) { item in
-            calendar.startOfDay(for: item.completedAt ?? .distantPast)
+    private func clearFocus() {
+        selectedTaskID = nil
+        editingTaskID = nil
+        if store.pendingTasks.isEmpty {
+            draftState.syncVisibility(hasPendingTasks: false)
+        } else {
+            draftState.dismissIfEmpty()
         }
-        return grouped
-            .map { CompletedGroup(date: $0.key, tasks: $0.value) }
-            .sorted { $0.date > $1.date }
+        draftFocused = false
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     private func estimatedAdditionalLines(for text: String) -> Int {
@@ -310,7 +382,7 @@ struct TaskListView: View {
             omittingEmptySubsequences: false
         )
         let estimatedLines = explicitLines.reduce(0) {
-            $0 + max(1, Int(ceil(Double($1.count) / 28)))
+            $0 + max(1, Int(ceil(Double($1.count) / 26)))
         }
         return max(0, min(estimatedLines, 6) - 1)
     }
@@ -323,7 +395,7 @@ struct TaskListView: View {
             }
             if event.keyCode == 51 || event.keyCode == 117 {
                 performAction { try store.delete(id: selectedTaskID) }
-                self.selectedTaskID = store.pendingTasks.first?.id
+                self.selectedTaskID = nil
                 return nil
             }
             return event
@@ -349,6 +421,7 @@ struct TaskListView: View {
                 try store.clearAll()
             }
         }
+        selectedTaskID = nil
         self.clearAction = nil
     }
 
@@ -378,14 +451,13 @@ private struct CompletedGroup {
 
 private struct CompletedTaskRow: View {
     let item: TaskItem
-    let showsDate: Bool
     let onRestore: () -> Void
     let onDelete: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 9) {
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))
@@ -393,18 +465,11 @@ private struct CompletedTaskRow: View {
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.text)
-                    .strikethrough()
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if showsDate, let completedAt = item.completedAt {
-                    Text(completedAt, style: .date)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.vertical, 5)
+            Text(item.text)
+                .strikethrough()
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 5)
             Button(action: onDelete) {
                 Image(systemName: "trash")
                     .foregroundStyle(.tertiary)
@@ -413,7 +478,7 @@ private struct CompletedTaskRow: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }

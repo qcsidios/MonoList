@@ -39,6 +39,10 @@ struct ReminderSchedulerSmoke {
         scheduler.wake(pendingCount: 1)
         precondition(scheduler.deadline == 11_600)
 
+        let testTasks = ReminderPanelController.tasksForTest([])
+        precondition(testTasks.count == 1)
+        precondition(testTasks[0].text == "这是一次轻提醒测试")
+
         print("Reminder scheduler smoke passed.")
     }
 }
