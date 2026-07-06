@@ -122,6 +122,19 @@ struct WindowCoordinatorSmoke {
             offeredHeight: 90
         )
         precondition(wrappedDraftHeight > emptyDraftHeight)
+        let taskListSource = try String(
+            contentsOfFile: "MonoList/Tasks/TaskListView.swift",
+            encoding: .utf8
+        )
+        precondition(
+            taskListSource.contains("onSelect: { selectTask(item.id) }")
+        )
+        precondition(
+            taskListSource.contains("private func selectTask(_ id: UUID)")
+        )
+        precondition(
+            taskListSource.contains("private func focusDraft(after id: UUID?)")
+        )
         let enterDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListEnterTests-\(UUID().uuidString)")
         let enterStore = TaskStore(

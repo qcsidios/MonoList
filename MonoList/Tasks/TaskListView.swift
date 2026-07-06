@@ -160,7 +160,7 @@ struct TaskListView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) {
-                    presentDraft(after: store.pendingTasks.last?.id)
+                    focusDraft(after: store.pendingTasks.last?.id)
                 }
                 .onTapGesture {
                     clearFocus()
@@ -191,10 +191,15 @@ struct TaskListView: View {
             WindowDragArea()
                 .frame(maxWidth: .infinity)
                 .frame(height: 30)
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        clearFocus()
+                    }
+                )
 
             Button {
                 commitDraft()
-                presentDraft(after: store.pendingTasks.last?.id)
+                focusDraft(after: store.pendingTasks.last?.id)
             } label: {
                 HeaderIconLabel(systemName: "plus")
             }
@@ -266,10 +271,10 @@ struct TaskListView: View {
                 onMoveUp: perform { try store.move(id: item.id, by: -1) },
                 onMoveDown: perform { try store.move(id: item.id, by: 1) },
                 onInsertAfter: {
-                    presentDraft(after: item.id)
+                    focusDraft(after: item.id)
                 },
                 isSelected: selectedTaskID == item.id,
-                onSelect: { selectedTaskID = item.id },
+                onSelect: { selectTask(item.id) },
                 onEditingChanged: { editing in
                     editingTaskID = editing ? item.id : nil
                 }
@@ -396,6 +401,8 @@ struct TaskListView: View {
         guard draftState.isPresented else { return }
         do {
             _ = try draftState.submitAndContinue(to: store)
+            selectedTaskID = nil
+            editingTaskID = nil
             DispatchQueue.main.async {
                 draftFocused = true
             }
@@ -404,9 +411,21 @@ struct TaskListView: View {
         }
     }
 
-    private func presentDraft(after id: UUID?) {
+    private func selectTask(_ id: UUID) {
+        commitDraft()
+        selectedTaskID = id
+        editingTaskID = nil
+        draftFocused = false
+        NSApp.keyWindow?.makeFirstResponder(nil)
+    }
+
+    private func focusDraft(after id: UUID?) {
+        selectedTaskID = nil
+        editingTaskID = nil
         draftState.present(after: id)
         DispatchQueue.main.async {
+            selectedTaskID = nil
+            editingTaskID = nil
             draftFocused = true
         }
     }
