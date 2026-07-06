@@ -16,6 +16,9 @@ struct MenuBarBridgeSmoke {
         precondition(MenuBarBridgeProtocol.pendingCountChanged.rawValue.hasPrefix(
             "com.qingcheng.monolist."
         ))
+        precondition(MenuBarBridgeProtocol.statusItemFrameChanged.rawValue.hasPrefix(
+            "com.qingcheng.monolist."
+        ))
         precondition(MenuBarBridgeProtocol.quit.rawValue.hasPrefix(
             "com.qingcheng.monolist."
         ))

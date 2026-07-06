@@ -9,7 +9,18 @@ final class WindowCoordinator {
     static let settingsWindowWidth: CGFloat = 430
 
     static func requiresScrolling(contentHeight: CGFloat) -> Bool {
-        contentHeight > mainPanelMaximumHeight
+        true
+    }
+
+    static func mainPanelAnchor(
+        below statusItemFrame: NSRect,
+        in visibleFrame: NSRect
+    ) -> NSPoint {
+        NSPoint(x: statusItemFrame.midX, y: visibleFrame.maxY)
+    }
+
+    static func isStatusItemClick(_ point: NSPoint, frame: NSRect?) -> Bool {
+        frame?.insetBy(dx: -2, dy: -2).contains(point) == true
     }
 
     static func fallbackMainPanelAnchor(
@@ -39,6 +50,8 @@ final class WindowCoordinator {
     private var updater: AppUpdater?
     private var onInstallUpdate: ((AppUpdate) -> Void)?
     private var onTestReminder: (() -> Void)?
+    private var menuBarAnchor: NSPoint?
+    private var menuBarButtonFrame: NSRect?
 
     var isMainPanelVisible: Bool {
         mainPanel?.isVisible == true
@@ -123,6 +136,39 @@ final class WindowCoordinator {
             return
         }
         showMainPanel(at: anchor)
+    }
+
+    func updateMenuBarLocation(anchor: NSPoint, buttonFrame: NSRect) {
+        menuBarAnchor = anchor
+        menuBarButtonFrame = buttonFrame
+    }
+
+    func toggleMainPanelFromDock() {
+        if let menuBarAnchor {
+            toggleMainPanel(at: menuBarAnchor)
+            return
+        }
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        toggleMainPanel(
+            at: Self.fallbackMainPanelAnchor(
+                in: screen.frame,
+                menuBarBottomY: screen.visibleFrame.maxY
+            )
+        )
+    }
+
+    func showOrFocusMainPanelFromMenuBar() {
+        if let menuBarAnchor {
+            showOrFocusMainPanel(at: menuBarAnchor)
+            return
+        }
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        showOrFocusMainPanel(
+            at: Self.fallbackMainPanelAnchor(
+                in: screen.frame,
+                menuBarBottomY: screen.visibleFrame.maxY
+            )
+        )
     }
 
     func showOrFocusMainPanel(relativeTo button: NSStatusBarButton) {
@@ -257,6 +303,17 @@ final class WindowCoordinator {
             defer: false
         )
         window.title = "MonoList 控制台"
+        window.titleVisibility = .hidden
+        let titleController = NSTitlebarAccessoryViewController()
+        titleController.layoutAttribute = .left
+        let titleLabel = NSTextField(labelWithString: window.title)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.frame = NSRect(x: 0, y: 2, width: 130, height: 18)
+        titleController.view = NSView(
+            frame: NSRect(x: 0, y: 0, width: 130, height: 22)
+        )
+        titleController.view.addSubview(titleLabel)
+        window.addTitlebarAccessoryViewController(titleController)
         window.center()
         window.isReleasedWhenClosed = false
         let hostingView = NSHostingView(
@@ -436,8 +493,16 @@ final class WindowCoordinator {
         globalOutsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] _ in
+            let clickPoint = NSEvent.mouseLocation
             Task { @MainActor in
-                self?.closeMainPanel()
+                guard let self else { return }
+                if Self.isStatusItemClick(
+                    clickPoint,
+                    frame: self.menuBarButtonFrame
+                ) {
+                    return
+                }
+                self.closeMainPanel()
             }
         }
         localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(

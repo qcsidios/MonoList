@@ -43,8 +43,11 @@ struct TaskListView: View {
 
     private var naturalHeight: CGFloat {
         let visibleTasks = store.pendingTasks + todayCompleted + visibleOlderCompleted
-        let extraLines = visibleTasks.reduce(0) {
-            $0 + estimatedAdditionalLines(for: $1.text)
+        var extraLines = visibleTasks.reduce(0) {
+            $0 + Self.additionalLines(for: $1.text)
+        }
+        if draftState.isPresented {
+            extraLines += Self.additionalLines(for: draftState.text)
         }
         let rows = store.pendingTasks.count +
             todayCompleted.count +
@@ -146,6 +149,7 @@ struct TaskListView: View {
                 ScrollView {
                     taskContent
                 }
+                .scrollBounceBehavior(.always, axes: .vertical)
             } else {
                 taskContent
             }
@@ -208,6 +212,7 @@ struct TaskListView: View {
                     .disabled(store.tasks.isEmpty)
             } label: {
                 Image(systemName: "ellipsis")
+                    .offset(y: -1)
                     .frame(width: 30, height: 30)
             }
             .menuStyle(.borderlessButton)
@@ -409,15 +414,20 @@ struct TaskListView: View {
         }
     }
 
-    private func estimatedAdditionalLines(for text: String) -> Int {
-        let explicitLines = text.split(
-            separator: "\n",
-            omittingEmptySubsequences: false
+    static func additionalLines(for text: String) -> Int {
+        guard !text.isEmpty else { return 0 }
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let bounds = (text as NSString).boundingRect(
+            with: NSSize(
+                width: 235,
+                height: CGFloat.greatestFiniteMagnitude
+            ),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
         )
-        let estimatedLines = explicitLines.reduce(0) {
-            $0 + max(1, Int(ceil(Double($1.count) / 26)))
-        }
-        return max(0, min(estimatedLines, 6) - 1)
+        let lineHeight = font.ascender - font.descender + font.leading
+        let lineCount = max(1, Int(ceil(bounds.height / lineHeight)))
+        return max(0, min(lineCount, 6) - 1)
     }
 
     private func installKeyboardMonitor() {

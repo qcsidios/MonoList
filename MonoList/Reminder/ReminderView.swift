@@ -49,8 +49,10 @@ struct ReminderView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(width: 340, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
         .onHover { model.isPaused = $0 }
     }

@@ -24,6 +24,24 @@ struct WindowCoordinatorSmoke {
             fallbackAnchor.x == visibleFrame.maxX -
                 WindowCoordinator.mainPanelWidth / 2 - 8
         )
+        let statusItemFrame = NSRect(x: 1180, y: 876, width: 72, height: 24)
+        let statusItemAnchor = WindowCoordinator.mainPanelAnchor(
+            below: statusItemFrame,
+            in: visibleFrame
+        )
+        precondition(statusItemAnchor == NSPoint(x: 1216, y: 900))
+        precondition(
+            WindowCoordinator.isStatusItemClick(
+                NSPoint(x: 1216, y: 888),
+                frame: statusItemFrame
+            )
+        )
+        precondition(
+            !WindowCoordinator.isStatusItemClick(
+                NSPoint(x: 1100, y: 888),
+                frame: statusItemFrame
+            )
+        )
         let originalFrame = NSRect(x: 120, y: 300, width: 336, height: 180)
         let expandedFrame = WindowCoordinator.mainPanelFrame(
             keepingTopOf: originalFrame,
@@ -44,7 +62,7 @@ struct WindowCoordinatorSmoke {
         )
         precondition(halfwayFrame.height == 220)
         precondition(halfwayFrame.maxY == originalFrame.maxY)
-        precondition(!WindowCoordinator.requiresScrolling(contentHeight: 479))
+        precondition(WindowCoordinator.requiresScrolling(contentHeight: 479))
         precondition(WindowCoordinator.requiresScrolling(contentHeight: 481))
         precondition(
             WindowCoordinator.preferredMainPanelHeight(
@@ -66,6 +84,11 @@ struct WindowCoordinatorSmoke {
                 todayCompletedCount: 7,
                 olderVisibleCount: 0
             ) == 430
+        )
+        precondition(
+            TaskListView.additionalLines(
+                for: String(repeating: "待办", count: 30)
+            ) >= 1
         )
 
         let draft = TaskDraftState()

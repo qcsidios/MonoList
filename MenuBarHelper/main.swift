@@ -5,6 +5,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
     private var parentProcessID: pid_t = 0
     private var parentMonitor: Timer?
     private var countObserver: NSObjectProtocol?
+    private var lastReportedFrame: NSRect?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -27,6 +28,9 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         item.button?.action = #selector(statusItemClicked(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
+        DispatchQueue.main.async { [weak self] in
+            self?.reportStatusItemFrameIfNeeded()
+        }
         countObserver = DistributedNotificationCenter.default().addObserver(
             forName: MenuBarBridgeProtocol.pendingCountChanged,
             object: nil,
@@ -37,6 +41,9 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             }
             self?.statusItem?.button?.title =
                 MenuBarBridgeProtocol.title(pendingCount: count)
+            DispatchQueue.main.async { [weak self] in
+                self?.reportStatusItemFrameIfNeeded()
+            }
         }
 
         parentMonitor = Timer.scheduledTimer(
@@ -44,6 +51,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             repeats: true
         ) { [weak self] _ in
             guard let self else { return }
+            self.reportStatusItemFrameIfNeeded()
             if self.parentProcessID <= 0 ||
                 kill(self.parentProcessID, 0) != 0 {
                 NSApp.terminate(nil)
@@ -92,6 +100,32 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             userInfo: [
                 "x": frame.midX,
                 "y": screen?.visibleFrame.maxY ?? frame.minY,
+            ],
+            deliverImmediately: true
+        )
+    }
+
+    private func reportStatusItemFrameIfNeeded() {
+        guard let button = statusItem?.button,
+              let window = button.window else {
+            return
+        }
+        let frame = window.convertToScreen(button.frame)
+        guard frame != lastReportedFrame else { return }
+        lastReportedFrame = frame
+        let screen = NSScreen.screens.first {
+            $0.frame.intersects(frame)
+        } ?? NSScreen.main
+        DistributedNotificationCenter.default().postNotificationName(
+            MenuBarBridgeProtocol.statusItemFrameChanged,
+            object: nil,
+            userInfo: [
+                "x": frame.minX,
+                "y": frame.minY,
+                "width": frame.width,
+                "height": frame.height,
+                "anchorX": frame.midX,
+                "anchorY": screen?.visibleFrame.maxY ?? frame.minY,
             ],
             deliverImmediately: true
         )

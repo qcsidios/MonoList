@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 
 @main
 struct ReminderSchedulerSmoke {
@@ -52,6 +53,19 @@ struct ReminderSchedulerSmoke {
         precondition(startFrame.size == finalFrame.size)
         precondition(startFrame.minX == finalFrame.minX)
         precondition(startFrame.minY == finalFrame.minY + 8)
+        let reminderModel = ReminderPresentationModel()
+        let reminderView = NSHostingView(
+            rootView: ReminderView(
+                totalCount: 1,
+                taskTexts: ["这是一次轻提醒测试"],
+                model: reminderModel,
+                onOpen: {},
+                onClose: {}
+            )
+        )
+        reminderView.frame = NSRect(x: 0, y: 0, width: 340, height: 300)
+        reminderView.layoutSubtreeIfNeeded()
+        precondition(reminderView.fittingSize.height < 110)
 
         guard !NSScreen.screens.isEmpty else {
             print("Reminder scheduler smoke passed (界面用例因无可用屏幕而跳过).")
@@ -69,6 +83,7 @@ struct ReminderSchedulerSmoke {
             onClose: {}
         )
         precondition(controller.isTesting)
+        precondition((controller.currentPanelHeight ?? 0) < 110)
         precondition(soundCount == 1)
         controller.close(animated: false)
         precondition(!controller.isTesting)

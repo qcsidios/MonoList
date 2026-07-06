@@ -156,7 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication,
         hasVisibleWindows flag: Bool
     ) -> Bool {
-        showOrFocusMainPanelAtFallback()
+        windowCoordinator?.toggleMainPanelFromDock()
         return true
     }
 
@@ -232,6 +232,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor in self?.openSettings() }
             },
             center.addObserver(
+                forName: MenuBarBridgeProtocol.statusItemFrameChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                let values = notification.userInfo
+                guard let xNumber = values?["x"] as? NSNumber,
+                      let yNumber = values?["y"] as? NSNumber,
+                      let widthNumber = values?["width"] as? NSNumber,
+                      let heightNumber = values?["height"] as? NSNumber,
+                      let anchorXNumber = values?["anchorX"] as? NSNumber,
+                      let anchorYNumber = values?["anchorY"] as? NSNumber else {
+                    return
+                }
+                let x = CGFloat(truncating: xNumber)
+                let y = CGFloat(truncating: yNumber)
+                let width = CGFloat(truncating: widthNumber)
+                let height = CGFloat(truncating: heightNumber)
+                let anchorX = CGFloat(truncating: anchorXNumber)
+                let anchorY = CGFloat(truncating: anchorYNumber)
+                Task { @MainActor in
+                    self?.windowCoordinator?.updateMenuBarLocation(
+                        anchor: NSPoint(x: anchorX, y: anchorY),
+                        buttonFrame: NSRect(
+                            x: x,
+                            y: y,
+                            width: width,
+                            height: height
+                        )
+                    )
+                }
+            },
+            center.addObserver(
                 forName: MenuBarBridgeProtocol.quit,
                 object: nil,
                 queue: .main
@@ -260,12 +292,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showOrFocusMainPanelAtFallback() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        windowCoordinator?.showOrFocusMainPanel(
-            at: WindowCoordinator.fallbackMainPanelAnchor(
-                in: screen.frame,
-                menuBarBottomY: screen.visibleFrame.maxY
-            )
-        )
+        windowCoordinator?.showOrFocusMainPanelFromMenuBar()
     }
 }

@@ -19,6 +19,10 @@ final class ReminderPanelController: ObservableObject {
         panel?.isVisible == true
     }
 
+    var currentPanelHeight: CGFloat? {
+        panel?.frame.height
+    }
+
     init(
         playSound: @escaping () -> Void = {
             if let sound = NSSound(named: NSSound.Name("Glass")) {
@@ -63,18 +67,7 @@ final class ReminderPanelController: ObservableObject {
 
         let snapshot = Array(tasks.prefix(3))
         let model = ReminderPresentationModel()
-        let panel = PassiveReminderPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: panelHeight(for: snapshot.count)),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.level = .statusBar
-        panel.collectionBehavior = [.transient, .moveToActiveSpace]
-        panel.contentView = NSHostingView(
+        let hostingView = NSHostingView(
             rootView: ReminderView(
                 totalCount: tasks.count,
                 taskTexts: snapshot.map(\.text),
@@ -88,6 +81,19 @@ final class ReminderPanelController: ObservableObject {
                 }
             )
         )
+        let contentHeight = ceil(hostingView.fittingSize.height)
+        let panel = PassiveReminderPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: contentHeight),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .statusBar
+        panel.collectionBehavior = [.transient, .moveToActiveSpace]
+        panel.contentView = hostingView
 
         let mousePoint = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mousePoint) })
@@ -204,10 +210,6 @@ final class ReminderPanelController: ObservableObject {
         } else {
             onClose = nil
         }
-    }
-
-    private func panelHeight(for taskCount: Int) -> CGFloat {
-        CGFloat(80 + taskCount * 40)
     }
 
     private func frame(

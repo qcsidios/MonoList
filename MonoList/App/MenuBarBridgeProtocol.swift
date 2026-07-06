@@ -11,6 +11,9 @@ enum MenuBarBridgeProtocol {
     static let pendingCountChanged = Notification.Name(
         "com.qingcheng.monolist.pendingCountChanged"
     )
+    static let statusItemFrameChanged = Notification.Name(
+        "com.qingcheng.monolist.statusItemFrameChanged"
+    )
     static let quit = Notification.Name(
         "com.qingcheng.monolist.quit"
     )
