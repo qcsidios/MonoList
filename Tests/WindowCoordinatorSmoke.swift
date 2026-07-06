@@ -135,6 +135,9 @@ struct WindowCoordinatorSmoke {
         precondition(
             taskListSource.contains("private func focusDraft(after id: UUID?)")
         )
+        precondition(
+            taskListSource.contains("TaskDragPreview()")
+        )
         let enterDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListEnterTests-\(UUID().uuidString)")
         let enterStore = TaskStore(

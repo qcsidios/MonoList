@@ -281,6 +281,8 @@ struct TaskListView: View {
             )
             .onDrag {
                 NSItemProvider(object: item.id.uuidString as NSString)
+            } preview: {
+                TaskDragPreview()
             }
             .onDrop(
                 of: [UTType.text],
@@ -530,6 +532,13 @@ private struct HeaderIconLabel: View {
                     .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
             )
             .onHover { isHovered = $0 }
+    }
+}
+
+private struct TaskDragPreview: View {
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
     }
 }
 
