@@ -11,6 +11,7 @@ struct TaskRowView: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
+    let submitRequest: Int
 
     @State private var text: String
     @State private var originalText: String
@@ -28,7 +29,8 @@ struct TaskRowView: View {
         onInsertAfter: @escaping () -> Void,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
-        onEditingChanged: @escaping (Bool) -> Void
+        onEditingChanged: @escaping (Bool) -> Void,
+        submitRequest: Int
     ) {
         self.item = item
         self.onSave = onSave
@@ -40,6 +42,7 @@ struct TaskRowView: View {
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
+        self.submitRequest = submitRequest
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
     }
@@ -111,6 +114,12 @@ struct TaskRowView: View {
         .onChange(of: isSelected) { _, newValue in
             if !newValue && isEditingMode {
                 isEditorFocused = false
+            }
+        }
+        .onChange(of: submitRequest) {
+            if isEditingMode {
+                finishEditing()
+                onInsertAfter()
             }
         }
         .onDisappear {

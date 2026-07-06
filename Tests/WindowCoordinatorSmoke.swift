@@ -104,6 +104,33 @@ struct WindowCoordinatorSmoke {
                 dateHeaderCount: 0
             ) > WindowCoordinator.mainPanelMaximumHeight
         )
+        precondition(TaskListView.isSubmitKeyCode(36))
+        precondition(TaskListView.isSubmitKeyCode(76))
+        precondition(!TaskListView.isSubmitKeyCode(48))
+        precondition(
+            TaskListView.submitTarget(
+                keyCode: 36,
+                hasMarkedText: false,
+                draftFocused: true,
+                isEditingTask: false
+            ) == .draft
+        )
+        precondition(
+            TaskListView.submitTarget(
+                keyCode: 36,
+                hasMarkedText: false,
+                draftFocused: false,
+                isEditingTask: true
+            ) == .editing
+        )
+        precondition(
+            TaskListView.submitTarget(
+                keyCode: 36,
+                hasMarkedText: true,
+                draftFocused: true,
+                isEditingTask: false
+            ) == .none
+        )
 
         let draft = TaskDraftState()
         draft.syncVisibility(hasPendingTasks: false)
