@@ -55,7 +55,7 @@ struct ShortcutDefinition: Codable, Equatable {
 
 struct SettingsValues: Codable, Equatable {
     var reminderEnabled = true
-    var reminderIntervalMinutes = 60
+    var reminderIntervalMinutes = 30
     var reminderPosition = ReminderPosition.topCenter
     var reminderSoundEnabled: Bool? = true
     var launchAtLogin = false

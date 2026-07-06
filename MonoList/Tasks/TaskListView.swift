@@ -54,12 +54,11 @@ struct TaskListView: View {
             visibleOlderCompleted.count +
             (draftState.isPresented ? 1 : 0)
         let dateHeaders = showsOlderCompleted ? completedGroups.count : 0
-        return 55 +
-            14 +
-            CGFloat(rows * 36) +
-            CGFloat(extraLines * 18) +
-            35 +
-            CGFloat(dateHeaders * 19)
+        return Self.contentHeight(
+            rowCount: rows,
+            additionalLineCount: extraLines,
+            dateHeaderCount: dateHeaders
+        )
     }
 
     private var preferredHeight: CGFloat {
@@ -295,12 +294,12 @@ struct TaskListView: View {
     }
 
     private var draftRow: some View {
-        HStack(alignment: .top, spacing: 9) {
+        HStack(alignment: .center, spacing: 9) {
             Image(systemName: "circle")
                 .font(.system(size: 18))
                 .foregroundStyle(.tertiary)
                 .frame(width: 28, height: 28)
-            TextField("输入待办，按 Enter 保存", text: $draftState.text, axis: .vertical)
+            TextField("", text: $draftState.text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...6)
                 .focused($draftFocused)
@@ -425,9 +424,20 @@ struct TaskListView: View {
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: font]
         )
-        let lineHeight = font.ascender - font.descender + font.leading
-        let lineCount = max(1, Int(ceil(bounds.height / lineHeight)))
+        let lineHeight = font.boundingRectForFont.height
+        let lineCount = max(1, Int(round(bounds.height / lineHeight)))
         return max(0, min(lineCount, 6) - 1)
+    }
+
+    static func contentHeight(
+        rowCount: Int,
+        additionalLineCount: Int,
+        dateHeaderCount: Int
+    ) -> CGFloat {
+        104 +
+            CGFloat(rowCount * 36) +
+            CGFloat(additionalLineCount * 13) +
+            CGFloat(dateHeaderCount * 19)
     }
 
     private func installKeyboardMonitor() {
@@ -542,7 +552,7 @@ private struct CompletedTaskRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 9) {
+        HStack(alignment: .center, spacing: 9) {
             Button(action: onRestore) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 18))

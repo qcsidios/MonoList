@@ -45,7 +45,7 @@ struct TaskRowView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 9) {
+        HStack(alignment: .center, spacing: 9) {
             Button {
                 onComplete(text)
             } label: {

@@ -12,7 +12,7 @@ struct WindowCoordinatorSmoke {
         let coordinator = WindowCoordinator(taskStore: store)
 
         precondition(WindowCoordinator.mainPanelWidth == 336)
-        precondition(WindowCoordinator.mainPanelMaximumHeight == 480)
+        precondition(WindowCoordinator.mainPanelMaximumHeight == 447)
         precondition(WindowCoordinator.settingsWindowWidth == 430)
         let visibleFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
         let fallbackAnchor = WindowCoordinator.fallbackMainPanelAnchor(
@@ -76,7 +76,7 @@ struct WindowCoordinatorSmoke {
                 pendingCount: 20,
                 todayCompletedCount: 10,
                 olderVisibleCount: 10
-            ) == 480
+            ) == WindowCoordinator.mainPanelMaximumHeight
         )
         precondition(
             WindowCoordinator.preferredMainPanelHeight(
@@ -87,8 +87,22 @@ struct WindowCoordinatorSmoke {
         )
         precondition(
             TaskListView.additionalLines(
-                for: String(repeating: "待办", count: 30)
-            ) >= 1
+                for: "shotlens升级。线上部署，把key放入安全环境。控制台 UI比例调整。"
+            ) == 1
+        )
+        precondition(
+            TaskListView.contentHeight(
+                rowCount: 7,
+                additionalLineCount: 7,
+                dateHeaderCount: 0
+            ) == WindowCoordinator.mainPanelMaximumHeight
+        )
+        precondition(
+            TaskListView.contentHeight(
+                rowCount: 8,
+                additionalLineCount: 8,
+                dateHeaderCount: 0
+            ) > WindowCoordinator.mainPanelMaximumHeight
         )
 
         let draft = TaskDraftState()

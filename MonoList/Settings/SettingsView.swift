@@ -286,17 +286,21 @@ private struct SettingsMenuControl<Content: View>: View {
         Menu {
             content
         } label: {
-            HStack(spacing: 0) {
+            ZStack {
                 Text(text)
                     .font(.system(size: 12, weight: .regular))
                     .foregroundStyle(.primary)
-                    .frame(width: 89, height: 26, alignment: .center)
-                Rectangle()
-                    .fill(Color.black.opacity(0.08))
-                    .frame(width: 0.5, height: 16)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
-                    .frame(width: 26.5, height: 26)
+                    .frame(width: 116, height: 26, alignment: .center)
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(width: 0.5, height: 16)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .frame(width: 26.5, height: 26)
+                }
+                .frame(width: 116, height: 26)
             }
             .frame(width: 116, height: 26)
             .contentShape(Rectangle())

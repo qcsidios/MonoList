@@ -5,7 +5,7 @@ import SwiftUI
 final class WindowCoordinator {
     static let mainPanelWidth: CGFloat = 336
     static let mainPanelMinimumHeight: CGFloat = 106
-    static let mainPanelMaximumHeight: CGFloat = 480
+    static let mainPanelMaximumHeight: CGFloat = 447
     static let settingsWindowWidth: CGFloat = 430
 
     static func requiresScrolling(contentHeight: CGFloat) -> Bool {
