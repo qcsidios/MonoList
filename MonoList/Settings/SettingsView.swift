@@ -14,25 +14,18 @@ struct SettingsView: View {
     @State private var currentDate = Date()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             softwareInformation
-                .padding(.horizontal, 16)
-                .padding(.top, 18)
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: 12) {
-                    SettingsCard(title: "轻提醒", systemImage: "bell") {
-                        reminderSettings
-                    }
-                    SettingsCard(title: "启动", systemImage: "power") {
-                        startupSettings
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+            SettingsCard(title: "轻提醒", systemImage: "bell") {
+                reminderSettings
+            }
+            SettingsCard(title: "启动", systemImage: "power") {
+                startupSettings
             }
         }
+        .padding(16)
         .frame(width: WindowCoordinator.settingsWindowWidth)
-        .frame(height: 520)
+        .fixedSize(horizontal: false, vertical: true)
         .background(Color.white)
         .environment(\.colorScheme, .light)
         .alert(
@@ -54,15 +47,18 @@ struct SettingsView: View {
     }
 
     private var softwareInformation: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 14) {
             MonoListLogoView(size: 58)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("MonoList")
                     .font(.system(size: 28, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
                 HStack(spacing: 7) {
                     Text("版本 \(appVersion)")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
+                        .frame(height: 24)
                     Button(updater.isChecking ? "检测中…" : "检测新版本") {
                         Task {
                             await updater.check(manual: true, settings: settings)
@@ -86,9 +82,10 @@ struct SettingsView: View {
                     }
                 }
             }
+            .frame(height: 58)
             Spacer(minLength: 0)
         }
-        .frame(minHeight: 70)
+        .frame(height: 58)
     }
 
     private var reminderSettings: some View {
@@ -116,25 +113,9 @@ struct SettingsView: View {
                 .toggleStyle(.switch)
             }
             Divider().opacity(0.4)
-            settingsRow("提醒间隔") {
-                SettingsPopupButton(
-                    items: [30, 60, 90, 120].map { "\($0) 分钟" },
-                    selectedTitle: "\(settings.reminderIntervalMinutes) 分钟"
-                ) { title in
-                    guard let interval = Int(
-                        title.split(separator: " ").first ?? ""
-                    ) else {
-                        return
-                    }
-                    updateSettings {
-                        $0.reminderIntervalMinutes = interval
-                    }
-                }
-                .frame(width: 116, height: 26)
-            }
             settingsRow("提醒时段") {
                 HStack(spacing: 6) {
-                    SettingsPopupButton(
+                    SettingsTimeComboBox(
                         items: Self.startTimeItems.map(Self.timeTitle),
                         selectedTitle: Self.timeTitle(
                             settings.reminderStartMinuteOfDay
@@ -151,7 +132,7 @@ struct SettingsView: View {
                     Text("至")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    SettingsPopupButton(
+                    SettingsTimeComboBox(
                         items: Self.endTimeItems.map(Self.timeTitle),
                         selectedTitle: Self.timeTitle(
                             settings.reminderEndMinuteOfDay
@@ -167,13 +148,29 @@ struct SettingsView: View {
                     .frame(width: 78, height: 26)
                 }
             }
+            settingsRow("提醒间隔") {
+                SettingsPopupButton(
+                    items: [30, 60, 90, 120].map { "\($0) 分钟" },
+                    selectedTitle: "\(settings.reminderIntervalMinutes) 分钟"
+                ) { title in
+                    guard let interval = Int(
+                        title.split(separator: " ").first ?? ""
+                    ) else {
+                        return
+                    }
+                    updateSettings {
+                        $0.reminderIntervalMinutes = interval
+                    }
+                }
+                .frame(width: 180, height: 26)
+            }
             settingsRow("下次提醒") {
                 Text(nextReminderText)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(nextReminderColor)
                     .lineLimit(1)
                     .padding(.horizontal, 9)
-                    .frame(width: 180, height: 26, alignment: .trailing)
+                    .frame(width: 180, height: 26, alignment: .center)
                     .background(
                         Color.primary.opacity(0.045),
                         in: RoundedRectangle(cornerRadius: 6)
@@ -197,11 +194,11 @@ struct SettingsView: View {
                         $0.reminderPosition = position
                     }
                 }
-                .frame(width: 116, height: 26)
+                .frame(width: 180, height: 26)
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
-                    .buttonStyle(FixedQuietButtonStyle(width: 116))
+                    .buttonStyle(FixedQuietButtonStyle(width: 180))
             }
         }
     }
@@ -370,9 +367,9 @@ private struct SettingsCard<Content: View>: View {
 private struct InlineUpdateButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 8)
-            .frame(height: 22)
+            .frame(height: 24)
             .background(
                 Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
                 in: Capsule()
@@ -399,6 +396,58 @@ private struct FixedQuietButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
             )
+    }
+}
+
+private struct SettingsTimeComboBox: NSViewRepresentable {
+    let items: [String]
+    let selectedTitle: String
+    let onSelect: (String) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelect: onSelect)
+    }
+
+    func makeNSView(context: Context) -> NSComboBox {
+        let comboBox = NSComboBox()
+        comboBox.isEditable = false
+        comboBox.usesDataSource = false
+        comboBox.numberOfVisibleItems = 8
+        comboBox.hasVerticalScroller = true
+        comboBox.controlSize = .small
+        comboBox.font = .systemFont(ofSize: 12)
+        comboBox.alignment = .center
+        comboBox.delegate = context.coordinator
+        return comboBox
+    }
+
+    func updateNSView(_ comboBox: NSComboBox, context: Context) {
+        context.coordinator.onSelect = onSelect
+        if comboBox.objectValues as? [String] != items {
+            comboBox.removeAllItems()
+            comboBox.addItems(withObjectValues: items)
+        }
+        let index = comboBox.indexOfItem(withObjectValue: selectedTitle)
+        if index >= 0 && comboBox.indexOfSelectedItem != index {
+            comboBox.selectItem(at: index)
+        }
+        comboBox.stringValue = selectedTitle
+    }
+
+    final class Coordinator: NSObject, NSComboBoxDelegate {
+        var onSelect: (String) -> Void
+
+        init(onSelect: @escaping (String) -> Void) {
+            self.onSelect = onSelect
+        }
+
+        func comboBoxSelectionDidChange(_ notification: Notification) {
+            guard let comboBox = notification.object as? NSComboBox,
+                  let title = comboBox.objectValueOfSelectedItem as? String else {
+                return
+            }
+            onSelect(title)
+        }
     }
 }
 

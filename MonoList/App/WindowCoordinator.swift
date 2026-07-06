@@ -312,11 +312,16 @@ final class WindowCoordinator {
         titleController.layoutAttribute = .left
         let titleLabel = NSTextField(labelWithString: window.title)
         titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        titleLabel.frame = NSRect(x: 0, y: 0, width: 150, height: 22)
-        titleController.view = NSView(
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        let titleContainer = NSView(
             frame: NSRect(x: 0, y: 0, width: 150, height: 22)
         )
-        titleController.view.addSubview(titleLabel)
+        titleContainer.addSubview(titleLabel)
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: titleContainer.leadingAnchor),
+            titleLabel.centerYAnchor.constraint(equalTo: titleContainer.centerYAnchor),
+        ])
+        titleController.view = titleContainer
         window.addTitlebarAccessoryViewController(titleController)
         window.center()
         window.isReleasedWhenClosed = false

@@ -140,6 +140,20 @@ struct WindowCoordinatorSmoke {
         )
         precondition(taskListSource.contains("withAnimation("))
         precondition(taskListSource.contains(".interactiveSpring"))
+        let settingsSource = try String(
+            contentsOfFile: "MonoList/Settings/SettingsView.swift",
+            encoding: .utf8
+        )
+        precondition(settingsSource.contains("SettingsTimeComboBox("))
+        precondition(settingsSource.contains("numberOfVisibleItems = 8"))
+        precondition(
+            settingsSource.contains("FixedQuietButtonStyle(width: 180)")
+        )
+        precondition(!settingsSource.contains("ScrollView(.vertical"))
+        let timeRow = settingsSource.range(of: "settingsRow(\"提醒时段\")")
+        let intervalRow = settingsSource.range(of: "settingsRow(\"提醒间隔\")")
+        precondition(timeRow != nil && intervalRow != nil)
+        precondition(timeRow!.lowerBound < intervalRow!.lowerBound)
         let enterDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListEnterTests-\(UUID().uuidString)")
         let enterStore = TaskStore(
