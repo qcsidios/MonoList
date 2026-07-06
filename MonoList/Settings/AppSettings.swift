@@ -57,6 +57,7 @@ struct SettingsValues: Codable, Equatable {
     var reminderEnabled = true
     var reminderIntervalMinutes = 60
     var reminderPosition = ReminderPosition.topCenter
+    var reminderSoundEnabled: Bool? = true
     var launchAtLogin = false
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
@@ -86,6 +87,7 @@ final class AppSettings: ObservableObject {
     var reminderEnabled: Bool { values.reminderEnabled }
     var reminderIntervalMinutes: Int { values.reminderIntervalMinutes }
     var reminderPosition: ReminderPosition { values.reminderPosition }
+    var reminderSoundEnabled: Bool { values.reminderSoundEnabled ?? true }
     var launchAtLogin: Bool { values.launchAtLogin }
     var globalShortcut: ShortcutDefinition? { values.globalShortcut }
     var lastAutomaticUpdateCheckAt: Date? { values.lastAutomaticUpdateCheckAt }

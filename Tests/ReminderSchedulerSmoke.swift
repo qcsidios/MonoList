@@ -46,20 +46,12 @@ struct ReminderSchedulerSmoke {
         precondition(testTasks[0].text == "这是一次轻提醒测试")
 
         let finalFrame = NSRect(x: 400, y: 500, width: 340, height: 180)
-        let centeredCompactFrame = ReminderPanelController.compactFrame(
-            for: finalFrame,
-            position: .topCenter
+        let startFrame = ReminderPanelController.presentationStartFrame(
+            for: finalFrame
         )
-        precondition(centeredCompactFrame.width == 36)
-        precondition(centeredCompactFrame.height == 36)
-        precondition(centeredCompactFrame.midX == finalFrame.midX)
-        precondition(centeredCompactFrame.maxY == finalFrame.maxY)
-        let rightCompactFrame = ReminderPanelController.compactFrame(
-            for: finalFrame,
-            position: .topRight
-        )
-        precondition(rightCompactFrame.maxX == finalFrame.maxX)
-        precondition(rightCompactFrame.maxY == finalFrame.maxY)
+        precondition(startFrame.size == finalFrame.size)
+        precondition(startFrame.minX == finalFrame.minX)
+        precondition(startFrame.minY == finalFrame.minY + 8)
 
         var soundCount = 0
         let controller = ReminderPanelController(playSound: { soundCount += 1 })
@@ -76,6 +68,17 @@ struct ReminderSchedulerSmoke {
         controller.close(animated: false)
         precondition(!controller.isTesting)
         precondition(soundCount == 1)
+        controller.show(
+            tasks: testTasks,
+            position: .topCenter,
+            menuBarButton: nil,
+            testing: true,
+            playsSound: false,
+            onOpen: {},
+            onClose: {}
+        )
+        precondition(soundCount == 1)
+        controller.close(animated: false)
 
         print("Reminder scheduler smoke passed.")
     }

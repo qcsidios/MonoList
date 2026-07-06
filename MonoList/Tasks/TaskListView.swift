@@ -99,7 +99,9 @@ struct TaskListView: View {
             onHeightChanged(height)
         }
         .onChange(of: store.pendingTasks.count) { _, count in
-            draftState.syncVisibility(hasPendingTasks: count > 0)
+            if count == 0 && !draftState.isPresented {
+                draftState.present(after: nil)
+            }
         }
         .onReceive(
             Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -151,7 +153,7 @@ struct TaskListView: View {
     }
 
     private var taskContent: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -160,7 +162,7 @@ struct TaskListView: View {
 
             VStack(spacing: 2) {
                 pendingRows
-                if draftState.isPresented && draftState.afterID == nil {
+                if draftState.isPresented {
                     draftRow
                 }
                 completedSection
@@ -208,7 +210,7 @@ struct TaskListView: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .fixedSize()
+            .frame(width: 30, height: 30)
             .background(
                 Color.primary.opacity(0.055),
                 in: RoundedRectangle(cornerRadius: 8)
@@ -257,12 +259,6 @@ struct TaskListView: View {
                 },
                 onMoveUp: perform { try store.move(id: item.id, by: -1) },
                 onMoveDown: perform { try store.move(id: item.id, by: 1) },
-                onInsertAfter: {
-                    draftState.present(after: item.id)
-                    DispatchQueue.main.async {
-                        draftFocused = true
-                    }
-                },
                 isSelected: selectedTaskID == item.id,
                 onSelect: { selectedTaskID = item.id },
                 onEditingChanged: { editing in
@@ -280,10 +276,6 @@ struct TaskListView: View {
                     errorMessage: $errorMessage
                 )
             )
-
-            if draftState.isPresented && draftState.afterID == item.id {
-                draftRow
-            }
         }
     }
 
@@ -305,7 +297,7 @@ struct TaskListView: View {
                     }
                 }
                 .onSubmit {
-                    commitDraft()
+                    continueDraft()
                 }
                 .onChange(of: draftFocused) { oldValue, newValue in
                     if oldValue && !newValue {
@@ -337,7 +329,7 @@ struct TaskListView: View {
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .medium))
                 .padding(.horizontal, 10)
-                .frame(height: 24)
+                .frame(width: 48, height: 24)
                 .background(Color.primary.opacity(0.055), in: Capsule())
             }
             .padding(.horizontal, 10)
@@ -383,6 +375,18 @@ struct TaskListView: View {
         guard draftState.isPresented else { return }
         do {
             try draftState.commitOrDismiss(to: store)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func continueDraft() {
+        guard draftState.isPresented else { return }
+        do {
+            _ = try draftState.submitAndContinue(to: store)
+            DispatchQueue.main.async {
+                draftFocused = true
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

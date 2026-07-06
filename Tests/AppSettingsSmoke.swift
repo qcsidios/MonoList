@@ -12,6 +12,7 @@ struct AppSettingsSmoke {
         precondition(settings.reminderEnabled)
         precondition(settings.reminderIntervalMinutes == 60)
         precondition(settings.reminderPosition == .topCenter)
+        precondition(settings.reminderSoundEnabled)
         precondition(!settings.launchAtLogin)
         precondition(settings.globalShortcut == nil)
         precondition(ReminderPosition.supportedCases == [.topCenter, .topRight])
@@ -22,6 +23,7 @@ struct AppSettingsSmoke {
             $0.reminderEnabled = false
             $0.reminderIntervalMinutes = 90
             $0.reminderPosition = .topRight
+            $0.reminderSoundEnabled = false
             $0.globalShortcut = ShortcutDefinition(keyCode: 40, modifiers: 1 << 20)
         }
 
@@ -29,6 +31,7 @@ struct AppSettingsSmoke {
         precondition(!reloaded.reminderEnabled)
         precondition(reloaded.reminderIntervalMinutes == 90)
         precondition(reloaded.reminderPosition == .topRight)
+        precondition(!reloaded.reminderSoundEnabled)
         precondition(reloaded.globalShortcut?.keyCode == 40)
 
         let legacyURL = directory.appendingPathComponent("legacy.json")
@@ -51,6 +54,7 @@ struct AppSettingsSmoke {
         let legacy = AppSettings(fileURL: legacyURL)
         precondition(legacy.loadError == nil)
         precondition(legacy.reminderPosition == .topCenter)
+        precondition(legacy.reminderSoundEnabled)
         precondition(legacy.launchAtLogin)
 
         let original = Data(#"{"schemaVersion":99,"values":{}}"#.utf8)

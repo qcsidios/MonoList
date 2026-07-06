@@ -21,10 +21,11 @@ open build/local/MonoList.app
 ## 功能
 
 - Dock 与菜单栏同时常驻
-- 按 Enter 或点击空白处保存的内联待办输入
+- 新增待办按 Enter 保存并自动继续下一行，点击空白处保存并结束输入
 - 双击编辑、整行拖动排序、单条删除
 - 当天完成任务保留在底部，较早记录可显示或隐藏
-- 30 / 60 / 90 / 120 分钟轻提醒
+- 30 / 60 / 90 / 120 分钟轻提醒，可单独关闭提醒声音
+- 菜单栏使用橘色数字徽标强调未完成任务数量
 - 可选开机启动与轻提醒测试
 - GitHub Release 应用内检测和升级
 
@@ -45,5 +46,5 @@ Developer ID、不进行 Apple 公证，也不上架 App Store。首次运行时
 构建发布包：
 
 ```bash
-MONOLIST_APP_VERSION=v0.4.0 bash scripts/package-dmg.sh
+MONOLIST_APP_VERSION=v0.4.1 bash scripts/package-dmg.sh
 ```

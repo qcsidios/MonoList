@@ -67,8 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "待办"
-        item.button?.toolTip = "MonoList 一栏"
+        updateStatusItem(item, pendingCount: store.pendingTasks.count)
+        item.button?.toolTip = "MonoList"
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -76,8 +76,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.$tasks
             .map { tasks in tasks.filter { $0.status == .pending }.count }
             .removeDuplicates()
-            .sink { [weak item] count in
-                item?.button?.title = count == 0 ? "待办" : "待办 \(count)"
+            .sink { [weak self, weak item] count in
+                guard let item else { return }
+                self?.updateStatusItem(item, pendingCount: count)
             }
             .store(in: &cancellables)
 
@@ -181,8 +182,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ sender: NSApplication,
         hasVisibleWindows flag: Bool
     ) -> Bool {
-        if !flag, let button = statusItem?.button {
-            windowCoordinator?.toggleMainPanel(relativeTo: button)
+        if let button = statusItem?.button {
+            windowCoordinator?.showOrFocusMainPanel(relativeTo: button)
         }
         return true
     }
@@ -212,6 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             position: settings.reminderPosition.supportedValue,
             menuBarButton: statusItem?.button,
             testing: testing,
+            playsSound: settings.reminderSoundEnabled,
             onOpen: { [weak self] in
                 guard let button = self?.statusItem?.button else { return }
                 self?.windowCoordinator?.toggleMainPanel(relativeTo: button)
@@ -223,6 +225,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     )
                 }
             }
+        )
+    }
+
+    private func updateStatusItem(_ item: NSStatusItem, pendingCount: Int) {
+        item.button?.attributedTitle = StatusItemLabel.attributedTitle(
+            pendingCount: pendingCount
+        )
+        item.button?.setAccessibilityTitle(
+            StatusItemLabel.accessibilityTitle(pendingCount: pendingCount)
         )
     }
 }

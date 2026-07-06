@@ -7,7 +7,6 @@ struct TaskRowView: View {
     let onDelete: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
-    let onInsertAfter: () -> Void
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
@@ -25,7 +24,6 @@ struct TaskRowView: View {
         onDelete: @escaping () -> Void,
         onMoveUp: @escaping () -> Void,
         onMoveDown: @escaping () -> Void,
-        onInsertAfter: @escaping () -> Void,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
         onEditingChanged: @escaping (Bool) -> Void
@@ -36,7 +34,6 @@ struct TaskRowView: View {
         self.onDelete = onDelete
         self.onMoveUp = onMoveUp
         self.onMoveDown = onMoveDown
-        self.onInsertAfter = onInsertAfter
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
@@ -70,7 +67,6 @@ struct TaskRowView: View {
                         }
                         .onSubmit {
                             finishEditing()
-                            onInsertAfter()
                         }
                 } else {
                     Text(text)

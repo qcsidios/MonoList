@@ -27,6 +27,13 @@ struct WindowCoordinatorSmoke {
             height: 120
         )
         precondition(collapsedFrame.maxY == originalFrame.maxY)
+        let halfwayFrame = WindowCoordinator.interpolatedMainPanelFrame(
+            from: originalFrame,
+            to: expandedFrame,
+            progress: 0.5
+        )
+        precondition(halfwayFrame.height == 220)
+        precondition(halfwayFrame.maxY == originalFrame.maxY)
         precondition(!WindowCoordinator.requiresScrolling(contentHeight: 479))
         precondition(WindowCoordinator.requiresScrolling(contentHeight: 481))
         precondition(
@@ -67,6 +74,13 @@ struct WindowCoordinatorSmoke {
         try draft.commitOrDismiss(to: store)
         precondition(store.pendingTasks.count == 2)
         precondition(!draft.isPresented)
+        draft.present(after: store.pendingTasks.last?.id)
+        draft.text = "连续输入第一条"
+        let continuedItem = try draft.submitAndContinue(to: store)
+        precondition(continuedItem?.text == "连续输入第一条")
+        precondition(draft.isPresented)
+        precondition(draft.text.isEmpty)
+        precondition(draft.afterID == continuedItem?.id)
         coordinator.showMainPanel(at: NSPoint(x: 500, y: 500))
         precondition(coordinator.isMainPanelVisible)
         coordinator.closeMainPanel()

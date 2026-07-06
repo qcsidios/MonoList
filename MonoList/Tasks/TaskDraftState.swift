@@ -19,6 +19,18 @@ final class TaskDraftState: ObservableObject {
         return item
     }
 
+    @discardableResult
+    func submitAndContinue(to store: TaskStore) throws -> TaskItem? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        let item = try store.add(text: text, after: afterID)
+        text = ""
+        afterID = item.id
+        isPresented = true
+        return item
+    }
+
     func present(after id: UUID?) {
         afterID = id
         isPresented = true

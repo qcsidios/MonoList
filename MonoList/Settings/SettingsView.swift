@@ -41,7 +41,7 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             MonoListLogoView(size: 46)
             VStack(alignment: .leading, spacing: 4) {
-                Text("MonoList 一栏")
+                Text("MonoList")
                     .font(.system(size: 20, weight: .semibold))
                 HStack(spacing: 7) {
                     Text("版本 \(appVersion)")
@@ -93,9 +93,22 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
             }
+            settingsRow("提醒声音") {
+                Toggle(
+                    "",
+                    isOn: binding(
+                        get: { settings.reminderSoundEnabled },
+                        update: { $0.reminderSoundEnabled = $1 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+            }
             Divider().opacity(0.4)
             settingsRow("提醒间隔") {
-                Menu {
+                SettingsMenuControl(
+                    text: "\(settings.reminderIntervalMinutes) 分钟"
+                ) {
                     ForEach([30, 60, 90, 120], id: \.self) { interval in
                         Button("\(interval) 分钟") {
                             updateSettings {
@@ -103,23 +116,10 @@ struct SettingsView: View {
                             }
                         }
                     }
-                } label: {
-                    SettingsMenuLabel(text: "\(settings.reminderIntervalMinutes) 分钟")
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 116, height: 26)
-                .background(
-                    Color.primary.opacity(0.055),
-                    in: RoundedRectangle(cornerRadius: 6)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-                )
             }
             settingsRow("提醒位置") {
-                Menu {
+                SettingsMenuControl(text: settings.reminderPosition.title) {
                     ForEach(ReminderPosition.supportedCases) { position in
                         Button(position.title) {
                             updateSettings {
@@ -127,20 +127,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                } label: {
-                    SettingsMenuLabel(text: settings.reminderPosition.title)
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .frame(width: 116, height: 26)
-                .background(
-                    Color.primary.opacity(0.055),
-                    in: RoundedRectangle(cornerRadius: 6)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-                )
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
@@ -262,7 +249,7 @@ private struct FixedQuietButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 12, weight: .regular))
             .frame(width: width, height: 26)
             .background(
                 Color.primary.opacity(configuration.isPressed ? 0.10 : 0.055),
@@ -275,27 +262,61 @@ private struct FixedQuietButtonStyle: ButtonStyle {
     }
 }
 
-private struct SettingsMenuLabel: View {
+private struct SettingsMenuControl<Content: View>: View {
     let text: String
+    @ViewBuilder let content: Content
     @State private var isHovered = false
+    @GestureState private var isPressed = false
+
+    init(
+        text: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.text = text
+        self.content = content()
+    }
 
     var body: some View {
-        HStack {
+        Menu {
+            content
+        } label: {
             Text(text)
-            Spacer(minLength: 0)
+                .padding(.leading, 9)
+                .padding(.trailing, 26)
+            .font(.system(size: 12, weight: .regular))
+            .foregroundStyle(.primary)
+            .frame(width: 116, height: 26, alignment: .leading)
         }
-        .font(.system(size: 11, weight: .medium))
-        .foregroundStyle(.primary)
-        .padding(.horizontal, 9)
-        .frame(maxWidth: .infinity, minHeight: 26)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 116, height: 26)
         .background(
-            Color.primary.opacity(isHovered ? 0.10 : 0.055),
+            Color.primary.opacity(
+                isPressed ? 0.14 : (isHovered ? 0.10 : 0.055)
+            ),
             in: RoundedRectangle(cornerRadius: 6)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
         )
+        .overlay(alignment: .trailing) {
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.08))
+                    .frame(width: 0.5, height: 16)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .frame(width: 26, height: 26)
+            }
+            .allowsHitTesting(false)
+        }
         .onHover { isHovered = $0 }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .updating($isPressed) { _, state, _ in
+                    state = true
+                }
+        )
     }
 }

@@ -20,7 +20,7 @@ final class WindowCoordinator {
     private var mainPanel: MainPanel?
     private var globalOutsideClickMonitor: Any?
     private var localOutsideClickMonitor: Any?
-    private var mainPanelResizeAnimation: NSViewAnimation?
+    private var mainPanelResizeTimer: Timer?
     private var pendingResizeWorkItem: DispatchWorkItem?
     private weak var previousApplication: NSRunningApplication?
     private var settingsWindow: NSWindow?
@@ -66,6 +66,23 @@ final class WindowCoordinator {
         )
     }
 
+    static func interpolatedMainPanelFrame(
+        from start: NSRect,
+        to end: NSRect,
+        progress: CGFloat
+    ) -> NSRect {
+        let value = min(max(progress, 0), 1)
+        func interpolate(_ start: CGFloat, _ end: CGFloat) -> CGFloat {
+            start + (end - start) * value
+        }
+        return NSRect(
+            x: interpolate(start.minX, end.minX),
+            y: interpolate(start.minY, end.minY),
+            width: interpolate(start.width, end.width),
+            height: interpolate(start.height, end.height)
+        )
+    }
+
     func configureSettings(
         settings: AppSettings,
         loginItemController: LoginItemController,
@@ -89,12 +106,17 @@ final class WindowCoordinator {
             return
         }
 
-        guard let buttonWindow = button.window else {
-            showMainPanel(at: NSEvent.mouseLocation)
+        showMainPanel(relativeTo: button)
+    }
+
+    func showOrFocusMainPanel(relativeTo button: NSStatusBarButton) {
+        if let mainPanel, mainPanel.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            mainPanel.makeKeyAndOrderFront(nil)
+            mainPanel.orderFrontRegardless()
             return
         }
-        let buttonFrame = buttonWindow.convertToScreen(button.frame)
-        showMainPanel(at: NSPoint(x: buttonFrame.midX, y: buttonFrame.minY))
+        showMainPanel(relativeTo: button)
     }
 
     func showMainPanel(at anchor: NSPoint) {
@@ -147,8 +169,8 @@ final class WindowCoordinator {
         }
         pendingResizeWorkItem?.cancel()
         pendingResizeWorkItem = nil
-        mainPanelResizeAnimation?.stop()
-        mainPanelResizeAnimation = nil
+        mainPanelResizeTimer?.invalidate()
+        mainPanelResizeTimer = nil
         mainPanel?.orderOut(nil)
         mainPanel = nil
 
@@ -289,25 +311,53 @@ final class WindowCoordinator {
     }
 
     private func performMainPanelResize(_ panel: NSPanel, to height: CGFloat) {
-        mainPanelResizeAnimation?.stop()
-        mainPanelResizeAnimation = nil
+        mainPanelResizeTimer?.invalidate()
+        mainPanelResizeTimer = nil
         let currentFrame = panel.frame
         guard abs(currentFrame.height - height) > 0.5 else { return }
         let targetFrame = Self.mainPanelFrame(
             keepingTopOf: currentFrame,
             height: height
         )
-        let animation = NSViewAnimation(
-            viewAnimations: [[
-                .target: panel,
-                .endFrame: NSValue(rect: targetFrame),
-            ]]
-        )
-        animation.duration = 0.22
-        animation.animationCurve = .easeInOut
-        animation.animationBlockingMode = .nonblocking
-        mainPanelResizeAnimation = animation
-        animation.start()
+        let duration = 0.22
+        let startTime = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(timeInterval: 1 / 60, repeats: true) {
+            [weak self, weak panel] timer in
+            Task { @MainActor in
+                guard let self,
+                      let panel,
+                      self.mainPanel === panel,
+                      self.mainPanelResizeTimer === timer else {
+                    timer.invalidate()
+                    return
+                }
+                let elapsed = ProcessInfo.processInfo.systemUptime - startTime
+                let linearProgress = min(max(elapsed / duration, 0), 1)
+                let easedProgress = linearProgress * linearProgress *
+                    (3 - 2 * linearProgress)
+                let frame = Self.interpolatedMainPanelFrame(
+                    from: currentFrame,
+                    to: targetFrame,
+                    progress: easedProgress
+                )
+                panel.setFrame(frame, display: true)
+                if linearProgress >= 1 {
+                    timer.invalidate()
+                    self.mainPanelResizeTimer = nil
+                }
+            }
+        }
+        mainPanelResizeTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func showMainPanel(relativeTo button: NSStatusBarButton) {
+        guard let buttonWindow = button.window else {
+            showMainPanel(at: NSEvent.mouseLocation)
+            return
+        }
+        let buttonFrame = buttonWindow.convertToScreen(button.frame)
+        showMainPanel(at: NSPoint(x: buttonFrame.midX, y: buttonFrame.minY))
     }
 
     private func rememberFrontmostApplication() {
