@@ -11,13 +11,12 @@ struct TaskRowView: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
-    let submitRequest: Int
 
     @State private var text: String
     @State private var originalText: String
     @State private var isEditingMode = false
     @State private var isHovered = false
-    @FocusState private var isEditorFocused: Bool
+    @State private var isEditorFocused = false
 
     init(
         item: TaskItem,
@@ -29,8 +28,7 @@ struct TaskRowView: View {
         onInsertAfter: @escaping () -> Void,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
-        onEditingChanged: @escaping (Bool) -> Void,
-        submitRequest: Int
+        onEditingChanged: @escaping (Bool) -> Void
     ) {
         self.item = item
         self.onSave = onSave
@@ -42,7 +40,6 @@ struct TaskRowView: View {
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
-        self.submitRequest = submitRequest
         _text = State(initialValue: item.text)
         _originalText = State(initialValue: item.text)
     }
@@ -62,18 +59,17 @@ struct TaskRowView: View {
 
             Group {
                 if isEditingMode {
-                    TextField("待办内容", text: $text, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .lineLimit(1...6)
-                        .focused($isEditorFocused)
+                    TaskTextEditor(
+                        text: $text,
+                        isFocused: $isEditorFocused
+                    ) {
+                        finishEditing()
+                        onInsertAfter()
+                    }
                         .onAppear {
                             DispatchQueue.main.async {
                                 isEditorFocused = true
                             }
-                        }
-                        .onSubmit {
-                            finishEditing()
-                            onInsertAfter()
                         }
                 } else {
                     Text(text)
@@ -114,12 +110,6 @@ struct TaskRowView: View {
         .onChange(of: isSelected) { _, newValue in
             if !newValue && isEditingMode {
                 isEditorFocused = false
-            }
-        }
-        .onChange(of: submitRequest) {
-            if isEditingMode {
-                finishEditing()
-                onInsertAfter()
             }
         }
         .onDisappear {

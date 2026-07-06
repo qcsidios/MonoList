@@ -14,6 +14,7 @@ swiftc \
   "$ROOT_DIR/MonoList/Tasks/TaskStore.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskListView.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskDraftState.swift" \
+  "$ROOT_DIR/MonoList/Tasks/TaskTextEditor.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskRowView.swift" \
   "$ROOT_DIR/MonoList/Tasks/HistoryView.swift" \
   "$ROOT_DIR/MonoList/Tasks/DataRecoveryView.swift" \

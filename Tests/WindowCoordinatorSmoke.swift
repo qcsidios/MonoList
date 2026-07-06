@@ -104,46 +104,33 @@ struct WindowCoordinatorSmoke {
                 dateHeaderCount: 0
             ) > WindowCoordinator.mainPanelMaximumHeight
         )
-        precondition(TaskListView.isSubmitKeyCode(36))
-        precondition(TaskListView.isSubmitKeyCode(76))
-        precondition(!TaskListView.isSubmitKeyCode(48))
-        precondition(
-            TaskListView.submitTarget(
-                keyCode: 36,
-                hasMarkedText: false,
-                draftFocused: true,
-                isEditingTask: false
-            ) == .draft
+        var directSubmitCount = 0
+        let directEditor = TaskSubmitTextView()
+        directEditor.onSubmit = { directSubmitCount += 1 }
+        directEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        precondition(directSubmitCount == 1)
+        let enterDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MonoListEnterTests-\(UUID().uuidString)")
+        let enterStore = TaskStore(
+            fileURL: enterDirectory.appendingPathComponent("tasks.json")
         )
+        let enterDraft = TaskDraftState()
+        enterDraft.present(after: nil)
+        enterDraft.text = "加号或双击新增的待办"
+        directEditor.onSubmit = {
+            try! enterDraft.submitAndContinue(to: enterStore)
+        }
+        directEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        precondition(enterStore.pendingTasks.map(\.text) == ["加号或双击新增的待办"])
+        precondition(enterDraft.isPresented)
+        precondition(enterDraft.text.isEmpty)
+        enterDraft.text = "下一行待办"
+        directEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
         precondition(
-            TaskListView.submitTarget(
-                keyCode: 36,
-                hasMarkedText: false,
-                draftFocused: false,
-                isEditingTask: true
-            ) == .editing
+            enterStore.pendingTasks.map(\.text) ==
+                ["加号或双击新增的待办", "下一行待办"]
         )
-        precondition(
-            TaskListView.submitTarget(
-                keyCode: 36,
-                hasMarkedText: true,
-                draftFocused: true,
-                isEditingTask: false
-            ) == .none
-        )
-        let routingState = TaskInputRoutingState()
-        precondition(
-            routingState.submitTarget(keyCode: 36, hasMarkedText: false) == .none
-        )
-        routingState.draftFocused = true
-        precondition(
-            routingState.submitTarget(keyCode: 36, hasMarkedText: false) == .draft
-        )
-        routingState.draftFocused = false
-        routingState.isEditingTask = true
-        precondition(
-            routingState.submitTarget(keyCode: 36, hasMarkedText: false) == .editing
-        )
+        precondition(enterDraft.isPresented)
 
         let draft = TaskDraftState()
         draft.syncVisibility(hasPendingTasks: false)

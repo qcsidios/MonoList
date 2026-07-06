@@ -3,30 +3,6 @@ import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum TaskInputSubmitTarget {
-    case none
-    case draft
-    case editing
-}
-
-@MainActor
-final class TaskInputRoutingState: ObservableObject {
-    var draftFocused = false
-    var isEditingTask = false
-
-    func submitTarget(
-        keyCode: UInt16,
-        hasMarkedText: Bool
-    ) -> TaskInputSubmitTarget {
-        TaskListView.submitTarget(
-            keyCode: keyCode,
-            hasMarkedText: hasMarkedText,
-            draftFocused: draftFocused,
-            isEditingTask: isEditingTask
-        )
-    }
-}
-
 struct TaskListView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var draftState: TaskDraftState
@@ -41,9 +17,7 @@ struct TaskListView: View {
     @State private var keyboardMonitor: Any?
     @State private var clearAction: ClearAction?
     @State private var currentDate = Date()
-    @State private var submitEditingRequest = 0
-    @StateObject private var inputRoutingState = TaskInputRoutingState()
-    @FocusState private var draftFocused: Bool
+    @State private var draftFocused = false
 
     private var todayCompleted: [TaskItem] {
         store.completedTasks(on: currentDate)
@@ -298,9 +272,7 @@ struct TaskListView: View {
                 onSelect: { selectedTaskID = item.id },
                 onEditingChanged: { editing in
                     editingTaskID = editing ? item.id : nil
-                    inputRoutingState.isEditingTask = editing
-                },
-                submitRequest: submitEditingRequest
+                }
             )
             .onDrag {
                 NSItemProvider(object: item.id.uuidString as NSString)
@@ -327,10 +299,11 @@ struct TaskListView: View {
                 .font(.system(size: 18))
                 .foregroundStyle(.tertiary)
                 .frame(width: 28, height: 28)
-            TextField("", text: $draftState.text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .lineLimit(1...6)
-                .focused($draftFocused)
+            TaskTextEditor(
+                text: $draftState.text,
+                isFocused: $draftFocused,
+                onSubmit: continueDraft
+            )
                 .onAppear {
                     if !store.pendingTasks.isEmpty {
                         DispatchQueue.main.async {
@@ -338,11 +311,7 @@ struct TaskListView: View {
                         }
                     }
                 }
-                .onSubmit {
-                    continueDraft()
-                }
                 .onChange(of: draftFocused) { oldValue, newValue in
-                    inputRoutingState.draftFocused = newValue
                     if oldValue && !newValue {
                         commitDraft()
                     }
@@ -469,45 +438,9 @@ struct TaskListView: View {
             CGFloat(dateHeaderCount * 19)
     }
 
-    static func isSubmitKeyCode(_ keyCode: UInt16) -> Bool {
-        keyCode == 36 || keyCode == 76
-    }
-
-    static func submitTarget(
-        keyCode: UInt16,
-        hasMarkedText: Bool,
-        draftFocused: Bool,
-        isEditingTask: Bool
-    ) -> TaskInputSubmitTarget {
-        guard isSubmitKeyCode(keyCode), !hasMarkedText else {
-            return .none
-        }
-        if draftFocused {
-            return .draft
-        }
-        if isEditingTask {
-            return .editing
-        }
-        return .none
-    }
-
     private func installKeyboardMonitor() {
         guard keyboardMonitor == nil else { return }
         keyboardMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let editor = NSApp.keyWindow?.firstResponder as? NSTextView
-            switch inputRoutingState.submitTarget(
-                keyCode: event.keyCode,
-                hasMarkedText: editor?.hasMarkedText() == true
-            ) {
-            case .draft:
-                continueDraft()
-                return nil
-            case .editing:
-                submitEditingRequest &+= 1
-                return nil
-            case .none:
-                break
-            }
             guard editingTaskID == nil, !draftFocused, let selectedTaskID else {
                 return event
             }

@@ -15,9 +15,6 @@ enum AppUpdateCheckResult: Equatable {
 @MainActor
 final class AppUpdater: ObservableObject {
     static let repository = "qcsidios/MonoList"
-    static let latestReleaseURL = URL(
-        string: "https://api.github.com/repos/\(repository)/releases/latest"
-    )!
     static let latestReleasePageURL = URL(
         string: "https://github.com/\(repository)/releases/latest"
     )!
@@ -76,30 +73,7 @@ final class AppUpdater: ObservableObject {
     }
 
     func checkForUpdate() async -> AppUpdateCheckResult {
-        let apiResult = await checkGitHubAPI()
-        guard case .failed = apiResult else {
-            return apiResult
-        }
         return await checkLatestReleasePage()
-    }
-
-    private func checkGitHubAPI() async -> AppUpdateCheckResult {
-        do {
-            var request = URLRequest(url: Self.latestReleaseURL)
-            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            request.setValue("MonoList", forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 12
-
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  http.url?.scheme == "https" else {
-                return .failed("检测新版本失败")
-            }
-            return Self.parseRelease(data, currentVersion: currentVersion)
-        } catch {
-            return .failed("检测新版本失败")
-        }
     }
 
     private func checkLatestReleasePage() async -> AppUpdateCheckResult {
@@ -145,37 +119,6 @@ final class AppUpdater: ObservableObject {
     func installationFailed() {
         isInstalling = false
         statusText = "升级失败"
-    }
-
-    static func parseRelease(
-        _ data: Data,
-        currentVersion: String
-    ) -> AppUpdateCheckResult {
-        do {
-            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-            guard !release.draft, !release.prerelease else {
-                return .failed("检测新版本失败")
-            }
-            guard isValidVersionTag(release.tagName) else {
-                return .failed("版本号无效")
-            }
-            guard compareVersions(release.tagName, currentVersion) == .orderedDescending else {
-                return .upToDate
-            }
-
-            let expectedName = "MonoList-\(release.tagName).dmg"
-            let matchingAssets = release.assets.filter { $0.name == expectedName }
-            guard matchingAssets.count == 1,
-                  let asset = matchingAssets.first,
-                  asset.browserDownloadURL.scheme == "https" else {
-                return .failed("更新包无效")
-            }
-            return .available(
-                AppUpdate(version: release.tagName, dmgURL: asset.browserDownloadURL)
-            )
-        } catch {
-            return .failed("检测新版本失败")
-        }
     }
 
     static func parseLatestReleaseURL(
@@ -243,27 +186,4 @@ final class AppUpdater: ObservableObject {
             as? String ?? "0.0.0"
     }
 
-    private struct GitHubRelease: Decodable {
-        let tagName: String
-        let draft: Bool
-        let prerelease: Bool
-        let assets: [GitHubAsset]
-
-        enum CodingKeys: String, CodingKey {
-            case tagName = "tag_name"
-            case draft
-            case prerelease
-            case assets
-        }
-    }
-
-    private struct GitHubAsset: Decodable {
-        let name: String
-        let browserDownloadURL: URL
-
-        enum CodingKeys: String, CodingKey {
-            case name
-            case browserDownloadURL = "browser_download_url"
-        }
-    }
 }
