@@ -216,7 +216,10 @@ final class UpdateInstaller {
     }
 
     trap fail ERR
-    while pgrep -x MonoList >/dev/null 2>&1; do sleep 0.2; done
+    while pgrep -x MonoList >/dev/null 2>&1 ||
+          pgrep -x MonoListMenuBar >/dev/null 2>&1; do
+      sleep 0.2
+    done
 
     hdiutil verify "$DMG_PATH" >/dev/null
     hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_DIR" >/dev/null

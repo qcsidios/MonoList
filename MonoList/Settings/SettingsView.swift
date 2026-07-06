@@ -23,7 +23,8 @@ struct SettingsView: View {
         .padding(16)
         .frame(width: WindowCoordinator.settingsWindowWidth)
         .fixedSize(horizontal: false, vertical: true)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.white)
+        .environment(\.colorScheme, .light)
         .alert(
             "操作失败",
             isPresented: Binding(
@@ -101,34 +102,28 @@ struct SettingsView: View {
             }
             Divider().opacity(0.4)
             settingsRow("提醒间隔") {
-                SettingsPopupButton(
-                    items: [30, 60, 90, 120].map { "\($0) 分钟" },
-                    selectedTitle: "\(settings.reminderIntervalMinutes) 分钟"
+                SettingsMenuControl(
+                    text: "\(settings.reminderIntervalMinutes) 分钟"
                 ) {
-                    guard let interval = Int($0.split(separator: " ").first ?? "") else {
-                        return
-                    }
-                    updateSettings {
-                        $0.reminderIntervalMinutes = interval
+                    ForEach([30, 60, 90, 120], id: \.self) { interval in
+                        Button("\(interval) 分钟") {
+                            updateSettings {
+                                $0.reminderIntervalMinutes = interval
+                            }
+                        }
                     }
                 }
-                .frame(width: 116, height: 26)
             }
             settingsRow("提醒位置") {
-                SettingsPopupButton(
-                    items: ReminderPosition.supportedCases.map(\.title),
-                    selectedTitle: settings.reminderPosition.title
-                ) { title in
-                    guard let position = ReminderPosition.supportedCases.first(
-                        where: { $0.title == title }
-                    ) else {
-                        return
-                    }
-                    updateSettings {
-                        $0.reminderPosition = position
+                SettingsMenuControl(text: settings.reminderPosition.title) {
+                    ForEach(ReminderPosition.supportedCases) { position in
+                        Button(position.title) {
+                            updateSettings {
+                                $0.reminderPosition = position
+                            }
+                        }
                     }
                 }
-                .frame(width: 116, height: 26)
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
@@ -235,7 +230,7 @@ private struct SettingsCard<Content: View>: View {
         }
         .padding(13)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 11))
     }
 }
 
@@ -274,46 +269,50 @@ private struct FixedQuietButtonStyle: ButtonStyle {
     }
 }
 
-private struct SettingsPopupButton: NSViewRepresentable {
-    let items: [String]
-    let selectedTitle: String
-    let onSelect: (String) -> Void
+private struct SettingsMenuControl<Content: View>: View {
+    let text: String
+    @ViewBuilder let content: Content
+    @State private var isHovered = false
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSelect: onSelect)
+    init(
+        text: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.text = text
+        self.content = content()
     }
 
-    func makeNSView(context: Context) -> NSPopUpButton {
-        let button = NSPopUpButton(frame: .zero, pullsDown: false)
-        button.controlSize = .small
-        button.font = .systemFont(ofSize: 12)
-        button.bezelStyle = .rounded
-        button.addItems(withTitles: items)
-        button.target = context.coordinator
-        button.action = #selector(Coordinator.selectionChanged(_:))
-        return button
-    }
-
-    func updateNSView(_ button: NSPopUpButton, context: Context) {
-        context.coordinator.onSelect = onSelect
-        if button.itemTitles != items {
-            button.removeAllItems()
-            button.addItems(withTitles: items)
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            HStack(spacing: 0) {
+                Text(text)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .padding(.leading, 9)
+                Spacer(minLength: 0)
+                Rectangle()
+                    .fill(Color.black.opacity(0.08))
+                    .frame(width: 0.5, height: 16)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .frame(width: 26, height: 26)
+            }
+            .frame(width: 116, height: 26)
+            .contentShape(Rectangle())
         }
-        button.selectItem(withTitle: selectedTitle)
-    }
-
-    final class Coordinator: NSObject {
-        var onSelect: (String) -> Void
-
-        init(onSelect: @escaping (String) -> Void) {
-            self.onSelect = onSelect
-        }
-
-        @objc
-        func selectionChanged(_ sender: NSPopUpButton) {
-            guard let title = sender.selectedItem?.title else { return }
-            onSelect(title)
-        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 116, height: 26)
+        .background(
+            Color.black.opacity(isHovered ? 0.08 : 0.035),
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+        )
+        .onHover { isHovered = $0 }
     }
 }

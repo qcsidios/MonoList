@@ -19,10 +19,17 @@ struct AppLaunchSmoke {
         let iconPNGURL = URL(fileURLWithPath: CommandLine.arguments[2])
         let contentsURL = appURL.appendingPathComponent("Contents")
         let executableURL = contentsURL.appendingPathComponent("MacOS/MonoList")
+        let helperURL = contentsURL.appendingPathComponent(
+            "Library/Helpers/MonoListMenuBar.app"
+        )
+        let helperExecutableURL = helperURL.appendingPathComponent(
+            "Contents/MacOS/MonoListMenuBar"
+        )
         let plistURL = contentsURL.appendingPathComponent("Info.plist")
 
         try requireDirectory(appURL, message: "MonoList.app 不存在")
         try requireExecutable(executableURL)
+        try requireExecutable(helperExecutableURL)
 
         let data = try Data(contentsOf: plistURL)
         let object = try PropertyListSerialization.propertyList(from: data, format: nil)
@@ -46,6 +53,25 @@ struct AppLaunchSmoke {
                     "应用必须显示在 Dock，LSUIElement 不能为 true")
         try require(plist["LSMinimumSystemVersion"] as? String == "14.0",
                     "最低系统版本必须为 macOS 14.0")
+        let helperData = try Data(
+            contentsOf: helperURL.appendingPathComponent("Contents/Info.plist")
+        )
+        let helperObject = try PropertyListSerialization.propertyList(
+            from: helperData,
+            format: nil
+        )
+        guard let helperPlist = helperObject as? [String: Any] else {
+            throw SmokeFailure.failed("菜单栏辅助程序 Info.plist 格式无效")
+        }
+        try require(
+            helperPlist["CFBundleIdentifier"] as? String ==
+                "com.qingcheng.monolist.menubar",
+            "菜单栏辅助程序 Bundle ID 不正确"
+        )
+        try require(
+            helperPlist["LSUIElement"] as? Bool == true,
+            "菜单栏辅助程序不能显示 Dock 图标"
+        )
         try requireNormalIconSafeArea(iconPNGURL)
         try requireSimplifiedIcon(iconPNGURL)
 

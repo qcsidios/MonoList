@@ -17,9 +17,9 @@ struct WindowCoordinatorSmoke {
         let visibleFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
         let fallbackAnchor = WindowCoordinator.fallbackMainPanelAnchor(
             in: visibleFrame,
-            statusBarThickness: 24
+            menuBarBottomY: 866
         )
-        precondition(fallbackAnchor.y == visibleFrame.maxY - 24)
+        precondition(fallbackAnchor.y == 866)
         precondition(
             fallbackAnchor.x == visibleFrame.maxX -
                 WindowCoordinator.mainPanelWidth / 2 - 8
@@ -59,6 +59,13 @@ struct WindowCoordinatorSmoke {
                 todayCompletedCount: 10,
                 olderVisibleCount: 10
             ) == 480
+        )
+        precondition(
+            WindowCoordinator.preferredMainPanelHeight(
+                pendingCount: 2,
+                todayCompletedCount: 7,
+                olderVisibleCount: 0
+            ) == 430
         )
 
         let draft = TaskDraftState()

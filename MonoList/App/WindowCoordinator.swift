@@ -14,11 +14,11 @@ final class WindowCoordinator {
 
     static func fallbackMainPanelAnchor(
         in screenFrame: NSRect,
-        statusBarThickness: CGFloat = NSStatusBar.system.thickness
+        menuBarBottomY: CGFloat
     ) -> NSPoint {
         NSPoint(
             x: screenFrame.maxX - mainPanelWidth / 2 - 8,
-            y: screenFrame.maxY - statusBarThickness
+            y: menuBarBottomY
         )
     }
 
@@ -57,10 +57,8 @@ final class WindowCoordinator {
         todayCompletedCount: Int,
         olderVisibleCount: Int
     ) -> CGFloat {
-        var height: CGFloat = 106 + CGFloat(pendingCount) * 43
-        if todayCompletedCount + olderVisibleCount > 0 {
-            height += 32 + CGFloat(todayCompletedCount + olderVisibleCount) * 42
-        }
+        let rowCount = pendingCount + todayCompletedCount + olderVisibleCount
+        let height: CGFloat = 106 + CGFloat(rowCount) * 36
         return min(max(height, mainPanelMinimumHeight), mainPanelMaximumHeight)
     }
 
@@ -119,6 +117,14 @@ final class WindowCoordinator {
         showMainPanel(relativeTo: button)
     }
 
+    func toggleMainPanel(at anchor: NSPoint) {
+        if isMainPanelVisible {
+            closeMainPanel(restoringFocus: true)
+            return
+        }
+        showMainPanel(at: anchor)
+    }
+
     func showOrFocusMainPanel(relativeTo button: NSStatusBarButton) {
         if let mainPanel, mainPanel.isVisible {
             NSApp.activate(ignoringOtherApps: true)
@@ -127,6 +133,16 @@ final class WindowCoordinator {
             return
         }
         showMainPanel(relativeTo: button)
+    }
+
+    func showOrFocusMainPanel(at anchor: NSPoint) {
+        if let mainPanel, mainPanel.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            mainPanel.makeKeyAndOrderFront(nil)
+            mainPanel.orderFrontRegardless()
+            return
+        }
+        showMainPanel(at: anchor)
     }
 
     func showMainPanel(at anchor: NSPoint) {
@@ -400,7 +416,12 @@ final class WindowCoordinator {
             }
         }
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        showMainPanel(at: Self.fallbackMainPanelAnchor(in: screen.frame))
+        showMainPanel(
+            at: Self.fallbackMainPanelAnchor(
+                in: screen.frame,
+                menuBarBottomY: screen.visibleFrame.maxY
+            )
+        )
     }
 
     private func rememberFrontmostApplication() {

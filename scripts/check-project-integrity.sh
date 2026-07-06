@@ -8,7 +8,7 @@ if git -C "$ROOT_DIR" ls-files | grep -qE '(^|/)\.DS_Store$'; then
   exit 1
 fi
 
-for path in MonoList Tests scripts docs release-notes; do
+for path in MonoList MenuBarHelper Tests scripts docs release-notes; do
   [[ -d "$ROOT_DIR/$path" ]] || {
     echo "缺少项目目录：$path" >&2
     exit 1

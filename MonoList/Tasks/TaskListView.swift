@@ -53,7 +53,7 @@ struct TaskListView: View {
         let dateHeaders = showsOlderCompleted ? completedGroups.count : 0
         return 55 +
             14 +
-            CGFloat(rows * 42) +
+            CGFloat(rows * 36) +
             CGFloat(extraLines * 18) +
             35 +
             CGFloat(dateHeaders * 19)
