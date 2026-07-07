@@ -123,8 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         scheduler.startPolling { [weak self] in
             guard let self else { return true }
-            return self.windowCoordinator?.isMainPanelVisible == true ||
-                self.windowCoordinator?.isSettingsVisible == true
+            return self.windowCoordinator?.isMainPanelVisible == true
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
