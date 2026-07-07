@@ -27,6 +27,8 @@ struct TaskStoreSmoke {
         try testExplicitReorderPersists()
         try testStableHistoryOrder()
         try testTodayAndOlderCompletedTasks()
+        try testOneTimeReminderPersistsAndClears()
+        try testDailyReminderReappearsAfterMidnight()
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
         try testUnknownSchemaDoesNotOverwriteFile()
@@ -155,6 +157,107 @@ struct TaskStoreSmoke {
             store.completedTasks(before: today, calendar: calendar).map(\.id) == [olderTask.id],
             "较早完成任务筛选不正确"
         )
+    }
+
+    @MainActor
+    private static func testOneTimeReminderPersistsAndClears() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let item = try store.add(text: "晚上六点提醒")
+        let reminderDate = Date(timeIntervalSince1970: 18 * 60 * 60)
+
+        try store.updateReminder(
+            id: item.id,
+            reminder: TaskReminder.once(at: reminderDate),
+            at: Date(timeIntervalSince1970: 10)
+        )
+
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(
+            reloaded.pendingTasks.first?.reminder == .once(at: reminderDate),
+            "一次性单条提醒没有持久化"
+        )
+
+        try reloaded.clearTriggeredOneTimeReminder(
+            id: item.id,
+            at: Date(timeIntervalSince1970: 20)
+        )
+        try require(
+            reloaded.pendingTasks.first?.reminder == nil,
+            "一次性单条提醒触发后没有清除"
+        )
+    }
+
+    @MainActor
+    private static func testDailyReminderReappearsAfterMidnight() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        let dayOne = calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 7, hour: 9)
+        )!
+        let dayTwo = calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 8, hour: 0, minute: 1)
+        )!
+        let item = try store.add(text: "每天喝水", createdAt: dayOne)
+        let reminderID = UUID(uuidString: "00000000-0000-0000-0000-000000000123")!
+        try store.updateReminder(
+            id: item.id,
+            reminder: TaskReminder.daily(minuteOfDay: 18 * 60, id: reminderID),
+            at: dayOne
+        )
+        try store.complete(id: item.id, at: dayOne.addingTimeInterval(60))
+
+        try store.refreshDailyReminderTasks(at: dayTwo, calendar: calendar)
+        try require(store.pendingTasks.count == 1, "每日提醒任务过 0 点后没有重新出现")
+        try require(store.historyTasks.count == 1, "每日提醒重新出现时不应删除昨天的完成记录")
+        try require(store.pendingTasks[0].text == "每天喝水", "每日提醒重新出现的文本不正确")
+        try require(
+            store.pendingTasks[0].reminder == .daily(minuteOfDay: 18 * 60, id: reminderID),
+            "每日提醒重新出现后没有保留提醒规则"
+        )
+
+        try store.refreshDailyReminderTasks(at: dayTwo.addingTimeInterval(60), calendar: calendar)
+        try require(store.pendingTasks.count == 1, "每日提醒任务同一天不应重复生成")
+
+        let todayTaskID = store.pendingTasks[0].id
+        try store.complete(id: todayTaskID, at: dayTwo.addingTimeInterval(10 * 60 * 60))
+        try store.refreshDailyReminderTasks(
+            at: dayTwo.addingTimeInterval(10 * 60 * 60 + 60),
+            calendar: calendar
+        )
+        try require(store.pendingTasks.isEmpty, "每日提醒任务今天完成后不应同一天再次出现")
+
+        try store.refreshDailyReminderTasks(
+            at: dayTwo.addingTimeInterval(24 * 60 * 60 + 60),
+            calendar: calendar
+        )
+        try require(store.pendingTasks.count == 1, "每日提醒任务第二天应再次出现")
+        try store.delete(id: store.pendingTasks[0].id)
+        try store.refreshDailyReminderTasks(
+            at: dayTwo.addingTimeInterval(2 * 24 * 60 * 60 + 60),
+            calendar: calendar
+        )
+        try require(store.pendingTasks.isEmpty, "删除每日提醒任务后不应再次生成")
+
+        let clearStore = TaskStore(
+            fileURL: fixture.directoryURL.appendingPathComponent("clear-pending.json")
+        )
+        let clearItem = try clearStore.add(text: "每天站立", createdAt: dayOne)
+        try clearStore.updateReminder(
+            id: clearItem.id,
+            reminder: .daily(minuteOfDay: 10 * 60),
+            at: dayOne
+        )
+        try clearStore.complete(id: clearItem.id, at: dayOne.addingTimeInterval(60))
+        try clearStore.refreshDailyReminderTasks(at: dayTwo, calendar: calendar)
+        try clearStore.clearPending()
+        try clearStore.refreshDailyReminderTasks(
+            at: dayTwo.addingTimeInterval(24 * 60 * 60 + 60),
+            calendar: calendar
+        )
+        try require(clearStore.pendingTasks.isEmpty, "清空未完成后每日提醒任务不应再次生成")
     }
 
     @MainActor

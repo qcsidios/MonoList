@@ -6,6 +6,7 @@ enum TaskStoreError: LocalizedError {
     case invalidSchemaVersion
     case missingTask
     case invalidOrder
+    case invalidReminder
     case recoveryRequired
     case writePaused
 
@@ -19,6 +20,8 @@ enum TaskStoreError: LocalizedError {
             return "找不到这条待办"
         case .invalidOrder:
             return "待办排序数据无效"
+        case .invalidReminder:
+            return "提醒时间无效"
         case .recoveryRequired:
             return "任务数据读取失败，请重试"
         case .writePaused:
@@ -155,6 +158,111 @@ final class TaskStore: ObservableObject {
         }
     }
 
+    func updateReminder(
+        id: UUID,
+        reminder: TaskReminder?,
+        at date: Date = Date()
+    ) throws {
+        if let reminder {
+            try validate(reminder)
+        }
+        try mutateTask(id: id) { item in
+            item.reminder = reminder
+            item.updatedAt = date
+        }
+    }
+
+    func clearTriggeredOneTimeReminder(
+        id: UUID,
+        at date: Date = Date()
+    ) throws {
+        try mutateTask(id: id) { item in
+            if item.reminder?.kind == .once {
+                item.reminder = nil
+                item.updatedAt = date
+            }
+        }
+    }
+
+    func markDedicatedReminderTriggered(
+        id: UUID,
+        at date: Date = Date()
+    ) throws {
+        try mutateTask(id: id) { item in
+            guard var reminder = item.reminder else { return }
+            switch reminder.kind {
+            case .once:
+                item.reminder = nil
+            case .daily:
+                reminder.lastTriggeredAt = date
+                item.reminder = reminder
+            }
+            item.updatedAt = date
+        }
+    }
+
+    func refreshDailyReminderTasks(
+        at date: Date = Date(),
+        calendar: Calendar = .current
+    ) throws {
+        try guardAvailable()
+        let startOfToday = calendar.startOfDay(for: date)
+        var candidate = tasks
+        let dailyGroups = Dictionary(
+            grouping: candidate.filter {
+                $0.reminder?.kind == .daily &&
+                    $0.reminder?.recurrenceID != nil
+            },
+            by: { $0.reminder!.recurrenceID! }
+        )
+        guard !dailyGroups.isEmpty else { return }
+
+        var pending = pendingTasks
+        var didChange = false
+        for (_, group) in dailyGroups {
+            if group.contains(where: { $0.status == .pending }) {
+                continue
+            }
+            guard let source = group.max(by: { lhs, rhs in
+                let lhsDate = lhs.completedAt ?? lhs.updatedAt
+                let rhsDate = rhs.completedAt ?? rhs.updatedAt
+                if lhsDate != rhsDate {
+                    return lhsDate < rhsDate
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }) else {
+                continue
+            }
+            if calendar.startOfDay(for: source.createdAt) >= startOfToday {
+                continue
+            }
+            var reminder = source.reminder
+            if reminder?.kind == .daily,
+               let lastTriggeredAt = reminder?.lastTriggeredAt,
+               calendar.startOfDay(for: lastTriggeredAt) >= startOfToday {
+                reminder?.lastTriggeredAt = nil
+            }
+            let item = TaskItem(
+                id: UUID(),
+                text: source.text,
+                status: .pending,
+                order: pending.count,
+                createdAt: date,
+                updatedAt: date,
+                completedAt: nil,
+                reminder: reminder
+            )
+            pending.append(item)
+            didChange = true
+        }
+        guard didChange else { return }
+
+        normalizeOrders(in: &pending)
+        candidate.removeAll { $0.status == .pending }
+        candidate.append(contentsOf: pending)
+        try commit(candidate)
+    }
+
     func move(id: UUID, by offset: Int) throws {
         try guardAvailable()
         guard offset != 0 else {
@@ -213,8 +321,15 @@ final class TaskStore: ObservableObject {
     func delete(id: UUID) throws {
         try guardAvailable()
         var candidate = tasks
-        guard candidate.contains(where: { $0.id == id }) else {
+        guard let item = candidate.first(where: { $0.id == id }) else {
             throw TaskStoreError.missingTask
+        }
+        if item.reminder?.kind == .daily,
+           let recurrenceID = item.reminder?.recurrenceID {
+            for index in candidate.indices
+            where candidate[index].reminder?.recurrenceID == recurrenceID {
+                candidate[index].reminder = nil
+            }
         }
         candidate.removeAll { $0.id == id }
         normalizePendingOrders(in: &candidate)
@@ -222,7 +337,26 @@ final class TaskStore: ObservableObject {
     }
 
     func clearPending() throws {
-        try clear { $0.status == .pending }
+        try guardAvailable()
+        var candidate = tasks
+        let recurrenceIDs = Set(
+            candidate.compactMap { item -> UUID? in
+                guard item.status == .pending,
+                      item.reminder?.kind == .daily else {
+                    return nil
+                }
+                return item.reminder?.recurrenceID
+            }
+        )
+        if !recurrenceIDs.isEmpty {
+            for index in candidate.indices
+            where candidate[index].reminder?.recurrenceID.map(recurrenceIDs.contains) == true {
+                candidate[index].reminder = nil
+            }
+        }
+        candidate.removeAll { $0.status == .pending }
+        normalizePendingOrders(in: &candidate)
+        try commit(candidate)
     }
 
     func clearHistory() throws {
@@ -320,6 +454,20 @@ final class TaskStore: ObservableObject {
         }
         if isWritePaused {
             throw TaskStoreError.writePaused
+        }
+    }
+
+    private func validate(_ reminder: TaskReminder) throws {
+        switch reminder.kind {
+        case .once:
+            guard reminder.date != nil else {
+                throw TaskStoreError.invalidReminder
+            }
+        case .daily:
+            guard (0..<24 * 60).contains(reminder.minuteOfDay),
+                  reminder.recurrenceID != nil else {
+                throw TaskStoreError.invalidReminder
+            }
         }
     }
 

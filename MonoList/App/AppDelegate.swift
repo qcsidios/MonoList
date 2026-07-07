@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appUpdater: AppUpdater?
     private var updateInstaller: UpdateInstaller?
     private var updateCheckTimer: Timer?
+    private var dailyReminderRefreshTimer: Timer?
     private var menuBarHelperProcess: Process?
     private var menuBarObservers: [NSObjectProtocol] = []
     private var cancellables = Set<AnyCancellable>()
@@ -33,10 +34,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.launchAtLogin && loginController.status != .enabled {
             try? loginController.setEnabled(true)
         }
+        try? store.refreshDailyReminderTasks()
         let reminderPanelController = ReminderPanelController()
-        let scheduler = ReminderScheduler { [weak self] in
-            self?.showReminder()
-        }
+        let scheduler = ReminderScheduler(
+            onDue: { [weak self] in
+                self?.showReminder()
+            },
+            onDedicatedReminderDue: { [weak self] id in
+                self?.showDedicatedReminder(taskID: id)
+            }
+        )
         let updater = AppUpdater()
         let updateInstaller = UpdateInstaller()
         let coordinator = WindowCoordinator(taskStore: store)
@@ -108,15 +115,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.$tasks
             .combineLatest(settings.$values)
             .sink { [weak scheduler, weak reminderPanelController] tasks, values in
-                let count = tasks.filter { $0.status == .pending }.count
+                let pendingTasks = tasks.filter { $0.status == .pending }
                 scheduler?.configure(
                     enabled: values.reminderEnabled,
                     intervalMinutes: values.reminderIntervalMinutes,
                     startMinuteOfDay: values.reminderStartMinuteOfDay,
                     endMinuteOfDay: values.reminderEndMinuteOfDay,
-                    pendingCount: count
+                    pendingTasks: pendingTasks
                 )
-                if !values.reminderEnabled || count == 0 {
+                if !values.reminderEnabled || pendingTasks.isEmpty {
                     reminderPanelController?.close()
                 }
             }
@@ -143,6 +150,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await updater.check(manual: false, settings: settings)
             }
         }
+        dailyReminderRefreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) {
+            [weak store] _ in
+            Task { @MainActor in
+                try? store?.refreshDailyReminderTasks()
+            }
+        }
     }
 
     private func openSettings() {
@@ -163,6 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        updateCheckTimer?.invalidate()
+        dailyReminderRefreshTimer?.invalidate()
         menuBarHelperProcess?.terminate()
         for observer in menuBarObservers {
             DistributedNotificationCenter.default().removeObserver(observer)
@@ -171,6 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc
     private func systemDidWake() {
+        try? taskStore?.refreshDailyReminderTasks()
         reminderScheduler?.wake(
             pendingCount: taskStore?.pendingTasks.count ?? 0
         )
@@ -205,6 +221,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     )
                 }
             }
+        )
+    }
+
+    private func showDedicatedReminder(taskID: UUID) {
+        guard let store = taskStore,
+              let settings = appSettings,
+              let task = store.pendingTasks.first(where: { $0.id == taskID }) else {
+            return
+        }
+        try? store.markDedicatedReminderTriggered(id: taskID)
+        reminderPanelController?.show(
+            tasks: [task],
+            position: settings.reminderPosition.supportedValue,
+            menuBarButton: nil,
+            playsSound: settings.reminderSoundEnabled,
+            onOpen: { [weak self] in
+                self?.showOrFocusMainPanelAtFallback()
+            },
+            onClose: {}
         )
     }
 

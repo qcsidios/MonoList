@@ -264,6 +264,9 @@ struct TaskListView: View {
                 onInsertAfter: {
                     focusDraft(after: item.id)
                 },
+                onUpdateReminder: perform { reminder in
+                    try store.updateReminder(id: item.id, reminder: reminder)
+                },
                 isSelected: selectedTaskID == item.id,
                 onSelect: { selectTask(item.id) },
                 onEditingChanged: { editing in

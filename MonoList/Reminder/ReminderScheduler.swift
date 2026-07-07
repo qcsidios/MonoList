@@ -9,23 +9,28 @@ final class ReminderScheduler: ObservableObject {
     private let wallClock: () -> Date
     private let calendar: Calendar
     private let onDue: () -> Void
+    private let onDedicatedReminderDue: (UUID) -> Void
     private var enabled = false
     private var interval: TimeInterval = 60 * 60
     private var startMinuteOfDay = 9 * 60
     private var endMinuteOfDay = 22 * 60
     private var pendingCount = 0
+    private var pendingTasks: [TaskItem] = []
+    private var dispatchedDedicatedReminderKeys = Set<String>()
     private var pollingTimer: Timer?
 
     init(
         now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
         wallClock: @escaping () -> Date = { Date() },
         calendar: Calendar = .current,
-        onDue: @escaping () -> Void
+        onDue: @escaping () -> Void,
+        onDedicatedReminderDue: @escaping (UUID) -> Void = { _ in }
     ) {
         self.now = now
         self.wallClock = wallClock
         self.calendar = calendar
         self.onDue = onDue
+        self.onDedicatedReminderDue = onDedicatedReminderDue
     }
 
     func configure(
@@ -33,6 +38,39 @@ final class ReminderScheduler: ObservableObject {
         intervalMinutes: Int,
         startMinuteOfDay: Int = 9 * 60,
         endMinuteOfDay: Int = 22 * 60,
+        pendingCount: Int
+    ) {
+        configureGlobalSchedule(
+            enabled: enabled,
+            intervalMinutes: intervalMinutes,
+            startMinuteOfDay: startMinuteOfDay,
+            endMinuteOfDay: endMinuteOfDay,
+            pendingCount: pendingCount
+        )
+    }
+
+    func configure(
+        enabled: Bool,
+        intervalMinutes: Int,
+        startMinuteOfDay: Int = 9 * 60,
+        endMinuteOfDay: Int = 22 * 60,
+        pendingTasks: [TaskItem]
+    ) {
+        self.pendingTasks = pendingTasks
+        configureGlobalSchedule(
+            enabled: enabled,
+            intervalMinutes: intervalMinutes,
+            startMinuteOfDay: startMinuteOfDay,
+            endMinuteOfDay: endMinuteOfDay,
+            pendingCount: pendingTasks.count
+        )
+    }
+
+    private func configureGlobalSchedule(
+        enabled: Bool,
+        intervalMinutes: Int,
+        startMinuteOfDay: Int,
+        endMinuteOfDay: Int,
         pendingCount: Int
     ) {
         let changed = self.enabled != enabled ||
@@ -79,6 +117,23 @@ final class ReminderScheduler: ObservableObject {
     }
 
     func evaluate(interfaceBusy: Bool) {
+        if enabled,
+           let dedicatedTask = Self.dueDedicatedReminderTask(
+               in: pendingTasks,
+               at: wallClock(),
+               calendar: calendar
+           ) {
+            let key = Self.dedicatedReminderDispatchKey(
+                for: dedicatedTask,
+                at: wallClock(),
+                calendar: calendar
+            )
+            if !dispatchedDedicatedReminderKeys.contains(key) {
+                dispatchedDedicatedReminderKeys.insert(key)
+                onDedicatedReminderDue(dedicatedTask.id)
+            }
+        }
+
         guard let deadline, now() >= deadline else {
             return
         }
@@ -170,6 +225,75 @@ final class ReminderScheduler: ObservableObject {
             on: tomorrow,
             calendar: calendar
         )
+    }
+
+    static func dueDedicatedReminderTask(
+        in tasks: [TaskItem],
+        at date: Date,
+        calendar: Calendar = .current
+    ) -> TaskItem? {
+        tasks
+            .filter { $0.status == .pending }
+            .compactMap { task -> (TaskItem, Date)? in
+                guard let reminderDate = dedicatedReminderDate(
+                    for: task,
+                    on: date,
+                    calendar: calendar
+                ), reminderDate <= date else {
+                    return nil
+                }
+                return (task, reminderDate)
+            }
+            .sorted {
+                if $0.1 != $1.1 {
+                    return $0.1 < $1.1
+                }
+                return $0.0.order < $1.0.order
+            }
+            .first?
+            .0
+    }
+
+    static func dedicatedReminderDate(
+        for task: TaskItem,
+        on date: Date,
+        calendar: Calendar = .current
+    ) -> Date? {
+        guard let reminder = task.reminder else { return nil }
+        switch reminder.kind {
+        case .once:
+            return reminder.date
+        case .daily:
+            guard (0..<24 * 60).contains(reminder.minuteOfDay) else {
+                return nil
+            }
+            if let lastTriggeredAt = reminder.lastTriggeredAt,
+               calendar.isDate(lastTriggeredAt, inSameDayAs: date) {
+                return nil
+            }
+            return boundaryDate(
+                matching: reminder.minuteOfDay,
+                on: date,
+                calendar: calendar
+            )
+        }
+    }
+
+    private static func dedicatedReminderDispatchKey(
+        for task: TaskItem,
+        at date: Date,
+        calendar: Calendar
+    ) -> String {
+        guard let reminder = task.reminder else {
+            return task.id.uuidString
+        }
+        switch reminder.kind {
+        case .once:
+            return "\(task.id.uuidString)-once-\(reminder.date?.timeIntervalSince1970 ?? 0)"
+        case .daily:
+            let day = calendar.startOfDay(for: date).timeIntervalSince1970
+            return "\(task.id.uuidString)-daily-\(day)"
+        }
     }
 
     private static func boundaryDate(

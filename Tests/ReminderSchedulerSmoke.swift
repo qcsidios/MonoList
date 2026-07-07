@@ -11,11 +11,24 @@ struct ReminderSchedulerSmoke {
         let calendar = fixedCalendar()
         var wallClock = fixedDate(hour: 10, minute: 0, calendar: calendar)
         var triggerCount = 0
+        var dedicatedReminderIDs: [UUID] = []
         let scheduler = ReminderScheduler(
             now: { now },
             wallClock: { wallClock },
             calendar: calendar,
-            onDue: { triggerCount += 1 }
+            onDue: { triggerCount += 1 },
+            onDedicatedReminderDue: { dedicatedReminderIDs.append($0) }
+        )
+        let dedicatedID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
+        let dedicatedTask = TaskItem(
+            id: dedicatedID,
+            text: "晚上六点提醒我",
+            status: .pending,
+            order: 0,
+            createdAt: fixedDate(hour: 9, minute: 0, calendar: calendar),
+            updatedAt: fixedDate(hour: 9, minute: 0, calendar: calendar),
+            completedAt: nil,
+            reminder: .once(at: fixedDate(hour: 18, minute: 0, calendar: calendar))
         )
 
         scheduler.configure(
@@ -23,7 +36,7 @@ struct ReminderSchedulerSmoke {
             intervalMinutes: 60,
             startMinuteOfDay: 9 * 60,
             endMinuteOfDay: 22 * 60,
-            pendingCount: 1
+            pendingTasks: [dedicatedTask]
         )
         precondition(scheduler.deadline == 3_700)
         precondition(
@@ -90,11 +103,29 @@ struct ReminderSchedulerSmoke {
             intervalMinutes: 30,
             startMinuteOfDay: 9 * 60,
             endMinuteOfDay: 22 * 60,
-            pendingCount: 1
+            pendingTasks: [dedicatedTask]
         )
         precondition(
             scheduler.nextReminderDate ==
                 fixedDate(dayOffset: 1, hour: 9, minute: 0, calendar: calendar)
+        )
+
+        wallClock = fixedDate(hour: 17, minute: 59, calendar: calendar)
+        now = 30_000
+        scheduler.configure(
+            enabled: true,
+            intervalMinutes: 30,
+            startMinuteOfDay: 9 * 60,
+            endMinuteOfDay: 22 * 60,
+            pendingTasks: [dedicatedTask]
+        )
+        let globalDeadlineBeforeDedicatedReminder = scheduler.deadline
+        wallClock = fixedDate(hour: 18, minute: 0, calendar: calendar)
+        scheduler.evaluate(interfaceBusy: true)
+        precondition(dedicatedReminderIDs == [dedicatedID])
+        precondition(
+            scheduler.deadline == globalDeadlineBeforeDedicatedReminder,
+            "单条提醒不应重排全局轻提醒"
         )
 
         let testTasks = ReminderPanelController.tasksForTest([])
