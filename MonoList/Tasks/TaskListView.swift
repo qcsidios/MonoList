@@ -219,6 +219,7 @@ struct TaskListView: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
+            .buttonStyle(HeaderIconButtonStyle())
             .frame(width: 30, height: 30)
             .simultaneousGesture(
                 TapGesture().onEnded {

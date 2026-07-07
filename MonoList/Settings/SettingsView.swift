@@ -2,6 +2,9 @@ import AppKit
 import SwiftUI
 
 struct SettingsView: View {
+    private static let controlWidth: CGFloat = 180
+    private static let controlHeight: CGFloat = 26
+
     @ObservedObject var settings: AppSettings
     @ObservedObject var taskStore: TaskStore
     @ObservedObject var reminderScheduler: ReminderScheduler
@@ -119,7 +122,8 @@ struct SettingsView: View {
                         items: Self.startTimeItems.map(Self.timeTitle),
                         selectedTitle: Self.timeTitle(
                             settings.reminderStartMinuteOfDay
-                        )
+                        ),
+                        maxVisibleItems: 8
                     ) { title in
                         guard let minute = Self.minuteOfDay(for: title) else {
                             return
@@ -128,7 +132,7 @@ struct SettingsView: View {
                             $0.reminderStartMinuteOfDay = minute
                         }
                     }
-                    .frame(width: 78, height: 26)
+                    .frame(width: 78, height: Self.controlHeight)
                     Text("至")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -136,7 +140,8 @@ struct SettingsView: View {
                         items: Self.endTimeItems.map(Self.timeTitle),
                         selectedTitle: Self.timeTitle(
                             settings.reminderEndMinuteOfDay
-                        )
+                        ),
+                        maxVisibleItems: 8
                     ) { title in
                         guard let minute = Self.minuteOfDay(for: title) else {
                             return
@@ -145,8 +150,9 @@ struct SettingsView: View {
                             $0.reminderEndMinuteOfDay = minute
                         }
                     }
-                    .frame(width: 78, height: 26)
+                    .frame(width: 78, height: Self.controlHeight)
                 }
+                .frame(width: Self.controlWidth, height: Self.controlHeight)
             }
             settingsRow("提醒间隔") {
                 SettingsPopupButton(
@@ -162,14 +168,18 @@ struct SettingsView: View {
                         $0.reminderIntervalMinutes = interval
                     }
                 }
-                .frame(width: 180, height: 26)
+                .frame(width: Self.controlWidth, height: Self.controlHeight)
             }
             settingsRow("下次提醒") {
                 Text(nextReminderText)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(nextReminderColor)
                     .lineLimit(1)
-                    .frame(width: 180, height: 26, alignment: .center)
+                    .frame(
+                        width: Self.controlWidth,
+                        height: Self.controlHeight,
+                        alignment: .center
+                    )
                     .modifier(SettingValueBackground())
             }
             settingsRow("提醒位置") {
@@ -186,7 +196,7 @@ struct SettingsView: View {
                         $0.reminderPosition = position
                     }
                 }
-                .frame(width: 180, height: 26)
+                .frame(width: Self.controlWidth, height: Self.controlHeight)
             }
             settingsRow("提醒测试") {
                 Button("立即测试", action: onTestReminder)
@@ -225,7 +235,7 @@ struct SettingsView: View {
                 .font(.system(size: 14, weight: .medium))
             Spacer(minLength: 16)
             content()
-                .frame(width: 180, alignment: .trailing)
+                .frame(width: Self.controlWidth, alignment: .trailing)
         }
         .frame(minHeight: 34)
     }
@@ -387,25 +397,27 @@ private struct FixedQuietButtonStyle: ButtonStyle {
 private struct SettingsPopupButton: View {
     let items: [String]
     let selectedTitle: String
+    var maxVisibleItems: Int? = nil
     let onSelect: (String) -> Void
 
+    @State private var isPresented = false
+
     var body: some View {
-        Menu {
-            ForEach(items, id: \.self) { item in
-                Button(item) {
-                    onSelect(item)
-                }
-            }
+        Button {
+            isPresented.toggle()
         } label: {
-            HStack(spacing: 6) {
+            ZStack {
                 Text(selectedTitle)
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .center)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.leading, 10)
             .padding(.trailing, 8)
@@ -413,9 +425,36 @@ private struct SettingsPopupButton: View {
             .modifier(SettingValueBackground())
         }
         .buttonStyle(.plain)
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .popover(isPresented: $isPresented, arrowEdge: .top) {
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    ForEach(items, id: \.self) { item in
+                        Button {
+                            onSelect(item)
+                            isPresented = false
+                        } label: {
+                            Text(item)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: Self.menuRowHeight)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(width: 180, height: menuHeight)
+        }
     }
+
+    private var menuHeight: CGFloat {
+        let visibleCount = min(items.count, maxVisibleItems ?? items.count)
+        return CGFloat(visibleCount) * Self.menuRowHeight + 8
+    }
+
+    private static let menuRowHeight: CGFloat = 28
 }
 
 private struct SettingValueBackground: ViewModifier {

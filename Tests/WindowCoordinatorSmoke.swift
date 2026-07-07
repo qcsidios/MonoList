@@ -148,9 +148,13 @@ struct WindowCoordinatorSmoke {
         precondition(settingsSource.contains("SettingValueBackground"))
         precondition(!settingsSource.contains("NSComboBox"))
         precondition(
+            settingsSource.contains("private static let controlWidth: CGFloat = 180")
+        )
+        precondition(settingsSource.contains("maxVisibleItems: 8"))
+        precondition(settingsSource.contains("ScrollView(.vertical"))
+        precondition(
             settingsSource.contains("FixedQuietButtonStyle(width: 180)")
         )
-        precondition(!settingsSource.contains("ScrollView(.vertical"))
         let timeRow = settingsSource.range(of: "settingsRow(\"提醒时段\")")
         let intervalRow = settingsSource.range(of: "settingsRow(\"提醒间隔\")")
         precondition(timeRow != nil && intervalRow != nil)
