@@ -518,11 +518,7 @@ final class WindowCoordinator {
         }
         localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
-        ) { [weak self, weak panel] event in
-            guard let self, let panel else { return event }
-            if event.window !== panel && event.window?.level != .statusBar {
-                self.closeMainPanel()
-            }
+        ) { event in
             return event
         }
     }

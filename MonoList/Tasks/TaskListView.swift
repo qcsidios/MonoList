@@ -46,6 +46,7 @@ struct TaskListView: View {
         var extraLines = visibleTasks.reduce(0) {
             $0 + Self.additionalLines(for: $1.text)
         }
+        extraLines += store.pendingTasks.filter { $0.reminder != nil }.count
         if draftState.isPresented {
             extraLines += Self.additionalLines(for: draftState.text)
         }
