@@ -146,7 +146,9 @@ struct WindowCoordinatorSmoke {
         )
         precondition(settingsSource.contains("SettingsPopupButton("))
         precondition(settingsSource.contains("SettingValueBackground"))
+        precondition(settingsSource.contains("SettingsSwitchStyle"))
         precondition(!settingsSource.contains("NSComboBox"))
+        precondition(!settingsSource.contains(".toggleStyle(.switch)"))
         precondition(
             settingsSource.contains("private static let controlWidth: CGFloat = 180")
         )

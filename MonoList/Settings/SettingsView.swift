@@ -102,7 +102,7 @@ struct SettingsView: View {
                     )
                 )
                 .labelsHidden()
-                .toggleStyle(.switch)
+                .toggleStyle(SettingsSwitchStyle())
             }
             settingsRow("提醒声音") {
                 Toggle(
@@ -113,7 +113,7 @@ struct SettingsView: View {
                     )
                 )
                 .labelsHidden()
-                .toggleStyle(.switch)
+                .toggleStyle(SettingsSwitchStyle())
             }
             Divider().opacity(0.4)
             settingsRow("提醒时段") {
@@ -222,7 +222,7 @@ struct SettingsView: View {
                 )
             )
             .labelsHidden()
-            .toggleStyle(.switch)
+            .toggleStyle(SettingsSwitchStyle())
         }
     }
 
@@ -391,6 +391,36 @@ private struct FixedQuietButtonStyle: ButtonStyle {
             .font(.system(size: 13, weight: .regular))
             .frame(width: width, height: 26)
             .modifier(SettingValueBackground(isPressed: configuration.isPressed))
+    }
+}
+
+private struct SettingsSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    configuration.isOn
+                        ? Color.accentColor
+                        : Color.primary.opacity(0.16)
+                )
+                .frame(width: 54, height: 28)
+                .overlay {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 24, height: 24)
+                        .shadow(
+                            color: Color.black.opacity(0.18),
+                            radius: 1.5,
+                            x: 0,
+                            y: 1
+                        )
+                        .offset(x: configuration.isOn ? 13 : -13)
+                }
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.12), value: configuration.isOn)
     }
 }
 

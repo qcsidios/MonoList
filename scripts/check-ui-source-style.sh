@@ -22,6 +22,12 @@ if grep -q 'NSComboBox' "$SETTINGS"; then
   exit 1
 fi
 
+if grep -q '\.toggleStyle(.switch)' "$SETTINGS" ||
+   ! grep -q 'SettingsSwitchStyle' "$SETTINGS"; then
+  echo "设置页开关必须使用项目内固定样式，避免系统 switch 重装后丢失白色滑块。" >&2
+  exit 1
+fi
+
 if ! grep -q 'SettingValueBackground' "$SETTINGS"; then
   echo "设置内容框必须复用统一的灰色圆角矩形样式。" >&2
   exit 1
