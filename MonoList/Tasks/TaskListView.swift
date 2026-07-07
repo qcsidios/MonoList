@@ -509,20 +509,12 @@ struct TaskListView: View {
 
 private struct HeaderIconLabel: View {
     let systemName: String
-    @State private var isHovered = false
 
     var body: some View {
         Image(systemName: systemName)
+            .font(.system(size: 15, weight: .regular))
+            .foregroundStyle(.primary)
             .frame(width: 30, height: 30)
-            .background(
-                Color.primary.opacity(isHovered ? 0.09 : 0.055),
-                in: RoundedRectangle(cornerRadius: 8)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
-            )
-            .onHover { isHovered = $0 }
     }
 }
 

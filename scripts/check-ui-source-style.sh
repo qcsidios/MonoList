@@ -11,9 +11,13 @@ if grep -q 'Image(systemName: "ellipsis")[[:space:]]*$' "$TASK_LIST" &&
   exit 1
 fi
 
-if ! grep -A18 'HeaderIconLabel(systemName: "ellipsis")' "$TASK_LIST" |
-   grep -q '\.buttonStyle(HeaderIconButtonStyle())'; then
-  echo "更多按钮必须保留和加号、设置一致的灰色圆角正方形背景。" >&2
+HEADER_ICON_BLOCK="$(awk '
+  /private struct HeaderIconLabel/ { capture = 1 }
+  /private struct TaskDragPreview/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+if echo "$HEADER_ICON_BLOCK" | grep -qE '\.background|\.overlay|RoundedRectangle'; then
+  echo "主窗口顶部三个图标按钮必须统一无背景，不画灰色圆角矩形。" >&2
   exit 1
 fi
 

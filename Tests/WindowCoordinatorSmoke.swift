@@ -140,6 +140,19 @@ struct WindowCoordinatorSmoke {
         )
         precondition(taskListSource.contains("withAnimation("))
         precondition(taskListSource.contains(".interactiveSpring"))
+        let headerIconStart = taskListSource.range(
+            of: "private struct HeaderIconLabel"
+        )
+        let headerIconEnd = taskListSource.range(
+            of: "private struct TaskDragPreview"
+        )
+        precondition(headerIconStart != nil && headerIconEnd != nil)
+        let headerIconSource = taskListSource[
+            headerIconStart!.lowerBound..<headerIconEnd!.lowerBound
+        ]
+        precondition(!headerIconSource.contains(".background"))
+        precondition(!headerIconSource.contains(".overlay"))
+        precondition(!headerIconSource.contains("RoundedRectangle"))
         let settingsSource = try String(
             contentsOfFile: "MonoList/Settings/SettingsView.swift",
             encoding: .utf8
