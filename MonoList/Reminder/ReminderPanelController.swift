@@ -13,7 +13,7 @@ final class ReminderPanelController: ObservableObject {
     private var onClose: (() -> Void)?
     private var finalFrame: NSRect?
     private var isClosing = false
-    private let playSound: () -> Void
+    private let playSound: (String) -> Void
 
     var isVisible: Bool {
         panel?.isVisible == true
@@ -23,9 +23,13 @@ final class ReminderPanelController: ObservableObject {
         panel?.frame.height
     }
 
+    static func resolvedSoundName(_ preferredName: String) -> String {
+        NSSound(named: NSSound.Name(preferredName)) == nil ? "Glass" : preferredName
+    }
+
     init(
-        playSound: @escaping () -> Void = {
-            if let sound = NSSound(named: NSSound.Name("Glass")) {
+        playSound: @escaping (String) -> Void = { name in
+            if let sound = NSSound(named: NSSound.Name(name)) {
                 sound.play()
             } else {
                 NSSound.beep()
@@ -56,6 +60,7 @@ final class ReminderPanelController: ObservableObject {
         menuBarButton: NSStatusBarButton?,
         testing: Bool = false,
         playsSound: Bool = true,
+        soundName: String = "Glass",
         onOpen: @escaping () -> Void,
         onClose: @escaping () -> Void
     ) {
@@ -120,7 +125,7 @@ final class ReminderPanelController: ObservableObject {
         isClosing = false
         remainingTenths = 30
         if playsSound {
-            playSound()
+            playSound(Self.resolvedSoundName(soundName))
         }
         DispatchQueue.main.async { [weak self, weak panel] in
             guard let self, let panel, self.panel === panel else { return }

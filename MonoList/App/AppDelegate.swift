@@ -93,9 +93,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.updateInstaller = updateInstaller
         windowCoordinator = coordinator
         installMenuBarObservers()
-        launchMenuBarHelper(pendingCount: store.pendingTasks.count)
+        launchMenuBarHelper(pendingCount: store.shortTermTasks.count)
         store.$tasks
-            .map { tasks in tasks.filter { $0.status == .pending }.count }
+            .map { tasks in
+                tasks.filter { $0.status == .pending && $0.group == .shortTerm }.count
+            }
             .removeDuplicates()
             .sink { count in
                 DistributedNotificationCenter.default().postNotificationName(
@@ -211,6 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuBarButton: nil,
             testing: testing,
             playsSound: settings.reminderSoundEnabled,
+            soundName: settings.reminderSoundName,
             onOpen: { [weak self] in
                 self?.showOrFocusMainPanelAtFallback()
             },
@@ -236,6 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             position: settings.reminderPosition.supportedValue,
             menuBarButton: nil,
             playsSound: settings.reminderSoundEnabled,
+            soundName: settings.reminderSoundName,
             onOpen: { [weak self] in
                 self?.showOrFocusMainPanelAtFallback()
             },

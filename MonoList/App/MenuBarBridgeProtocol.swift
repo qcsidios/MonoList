@@ -19,6 +19,6 @@ enum MenuBarBridgeProtocol {
     )
 
     static func title(pendingCount: Int) -> String {
-        pendingCount == 0 ? "待办" : "待办 \(pendingCount)"
+        pendingCount == 0 ? "" : "\(pendingCount)"
     }
 }

@@ -25,9 +25,13 @@ struct TaskStoreSmoke {
         try testEditAndMovePersist()
         try testCompleteCommitsPendingTextAtomically()
         try testExplicitReorderPersists()
+        try testTaskGroupsPersistAndMoveAtReleasePosition()
+        try testLegacyTasksDefaultToShortTerm()
+        try testDraftKeepsLongTermGroupWhenContinuing()
         try testStableHistoryOrder()
         try testTodayAndOlderCompletedTasks()
         try testOneTimeReminderPersistsAndClears()
+        try testCountdownAndScheduledDateConstruction()
         try testDailyReminderReappearsAfterMidnight()
         try testDeleteAndClearScopes()
         try testWriteFailureKeepsCommittedState()
@@ -110,6 +114,60 @@ struct TaskStoreSmoke {
     }
 
     @MainActor
+    private static func testTaskGroupsPersistAndMoveAtReleasePosition() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let shortOne = try store.add(text: "短期一")
+        let shortTwo = try store.add(text: "短期二")
+        let longOne = try store.add(text: "长期一", group: .longTerm)
+        let longTwo = try store.add(text: "长期二", group: .longTerm)
+
+        try store.move(id: shortTwo.id, to: .longTerm, before: longTwo.id)
+        try require(store.shortTermTasks.map(\.id) == [shortOne.id],
+                    "跨组后短期任务不正确")
+        try require(store.longTermTasks.map(\.id) == [longOne.id, shortTwo.id, longTwo.id],
+                    "跨组任务没有插入释放位置")
+
+        let reloaded = TaskStore(fileURL: fixture.fileURL)
+        try require(reloaded.longTermTasks.map(\.id) == [longOne.id, shortTwo.id, longTwo.id],
+                    "跨组排序或分组没有持久化")
+    }
+
+    @MainActor
+    private static func testLegacyTasksDefaultToShortTerm() throws {
+        let fixture = try Fixture()
+        let taskID = UUID()
+        let data = Data(
+            """
+            {"schemaVersion":1,"tasks":[{"id":"\(taskID.uuidString)","text":"旧任务","status":"pending","order":0,"createdAt":"1970-01-01T00:00:00Z","updatedAt":"1970-01-01T00:00:00Z","completedAt":null,"reminder":null}]}
+            """.utf8
+        )
+        try data.write(to: fixture.fileURL)
+        let store = TaskStore(fileURL: fixture.fileURL)
+        try require(store.loadError == nil, "旧任务数据无法读取")
+        try require(store.shortTermTasks.map(\.id) == [taskID], "旧任务没有默认归入短期")
+        try require(store.longTermTasks.isEmpty, "旧任务错误归入长期")
+    }
+
+    @MainActor
+    private static func testDraftKeepsLongTermGroupWhenContinuing() throws {
+        let fixture = try Fixture()
+        let store = TaskStore(fileURL: fixture.fileURL)
+        let existing = try store.add(text: "长期起点", group: .longTerm)
+        let draft = TaskDraftState()
+        draft.present(after: existing.id, in: .longTerm)
+        draft.text = "长期新增一"
+        _ = try draft.submitAndContinue(to: store)
+        draft.text = "长期新增二"
+        let second = try draft.submitAndContinue(to: store)
+
+        try require(store.longTermTasks.map(\.text) == ["长期起点", "长期新增一", "长期新增二"],
+                    "长期任务连续新增没有留在长期分组")
+        try require(draft.afterID == second?.id, "连续新增没有更新分组内插入位置")
+        try require(draft.group == .longTerm, "连续新增丢失目标分组")
+    }
+
+    @MainActor
     private static func testStableHistoryOrder() throws {
         let fixture = try Fixture()
         let store = TaskStore(fileURL: fixture.fileURL)
@@ -186,6 +244,26 @@ struct TaskStoreSmoke {
             reloaded.pendingTasks.first?.reminder == nil,
             "一次性单条提醒触发后没有清除"
         )
+    }
+
+    private static func testCountdownAndScheduledDateConstruction() throws {
+        let now = Date(timeIntervalSince1970: 1_000)
+        try require(TaskReminder.countdown(minutes: 20, from: now) ==
+            .once(at: Date(timeIntervalSince1970: 2_200)),
+            "倒计时没有换算为绝对触发时间")
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 8 * 60 * 60)!
+        let day = calendar.date(from: DateComponents(year: 2026, month: 7, day: 14))!
+        let expected = calendar.date(
+            from: DateComponents(year: 2026, month: 7, day: 14, hour: 18, minute: 30)
+        )!
+        try require(TaskReminder.once(on: day, minuteOfDay: 18 * 60 + 30,
+                                      calendar: calendar) == .once(at: expected),
+                    "指定日期时间构造不正确")
+        try require(TaskReminder.once(on: day, minuteOfDay: 24 * 60,
+                                      calendar: calendar) == nil,
+                    "越界时间不应生成提醒")
     }
 
     @MainActor

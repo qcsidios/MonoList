@@ -5,6 +5,7 @@ import Foundation
 final class TaskDraftState: ObservableObject {
     @Published var text = ""
     @Published var afterID: UUID?
+    @Published var group: TaskGroup = .shortTerm
     @Published private(set) var isPresented = true
 
     @discardableResult
@@ -12,7 +13,7 @@ final class TaskDraftState: ObservableObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
         }
-        let item = try store.add(text: text, after: afterID)
+        let item = try store.add(text: text, after: afterID, group: group)
         text = ""
         afterID = nil
         isPresented = false
@@ -24,15 +25,16 @@ final class TaskDraftState: ObservableObject {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
         }
-        let item = try store.add(text: text, after: afterID)
+        let item = try store.add(text: text, after: afterID, group: group)
         text = ""
         afterID = item.id
         isPresented = true
         return item
     }
 
-    func present(after id: UUID?) {
+    func present(after id: UUID?, in group: TaskGroup = .shortTerm) {
         afterID = id
+        self.group = group
         isPresented = true
     }
 

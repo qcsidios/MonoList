@@ -15,6 +15,7 @@ struct AppSettingsSmoke {
         precondition(settings.reminderEndMinuteOfDay == 22 * 60)
         precondition(settings.reminderPosition == .topCenter)
         precondition(settings.reminderSoundEnabled)
+        precondition(settings.reminderSoundName == "Glass")
         precondition(!settings.launchAtLogin)
         precondition(settings.globalShortcut == nil)
         precondition(ReminderPosition.supportedCases == [.topCenter, .topRight])
@@ -28,6 +29,7 @@ struct AppSettingsSmoke {
             $0.reminderEndMinuteOfDay = 21 * 60
             $0.reminderPosition = .topRight
             $0.reminderSoundEnabled = false
+            $0.reminderSoundName = "Ping"
             $0.globalShortcut = ShortcutDefinition(keyCode: 40, modifiers: 1 << 20)
         }
 
@@ -38,6 +40,7 @@ struct AppSettingsSmoke {
         precondition(reloaded.reminderEndMinuteOfDay == 21 * 60)
         precondition(reloaded.reminderPosition == .topRight)
         precondition(!reloaded.reminderSoundEnabled)
+        precondition(reloaded.reminderSoundName == "Ping")
         precondition(reloaded.globalShortcut?.keyCode == 40)
 
         do {
@@ -72,6 +75,7 @@ struct AppSettingsSmoke {
         precondition(legacy.reminderStartMinuteOfDay == 9 * 60)
         precondition(legacy.reminderEndMinuteOfDay == 22 * 60)
         precondition(legacy.reminderSoundEnabled)
+        precondition(legacy.reminderSoundName == "Glass")
         precondition(legacy.launchAtLogin)
 
         let original = Data(#"{"schemaVersion":99,"values":{}}"#.utf8)

@@ -9,6 +9,7 @@ struct TaskRowView: View {
     let onMoveDown: () -> Void
     let onInsertAfter: () -> Void
     let onUpdateReminder: (TaskReminder?) -> Void
+    let onChangeGroup: () -> Void
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
@@ -29,6 +30,7 @@ struct TaskRowView: View {
         onMoveDown: @escaping () -> Void,
         onInsertAfter: @escaping () -> Void,
         onUpdateReminder: @escaping (TaskReminder?) -> Void,
+        onChangeGroup: @escaping () -> Void,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
         onEditingChanged: @escaping (Bool) -> Void
@@ -41,6 +43,7 @@ struct TaskRowView: View {
         self.onMoveDown = onMoveDown
         self.onInsertAfter = onInsertAfter
         self.onUpdateReminder = onUpdateReminder
+        self.onChangeGroup = onChangeGroup
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
@@ -139,6 +142,8 @@ struct TaskRowView: View {
                 }
             }
             Divider()
+            Button(item.group == .shortTerm ? "移至长期任务" : "移至短期任务",
+                   action: onChangeGroup)
             Button("上移", action: onMoveUp)
             Button("下移", action: onMoveDown)
             Divider()
@@ -178,7 +183,10 @@ struct TaskRowView: View {
         switch reminder.kind {
         case .once:
             guard let date = reminder.date else { return nil }
-            return "今天 \(Self.timeTitle(for: date))"
+            if Calendar.current.isDateInToday(date) {
+                return "今天 \(Self.timeTitle(for: date))"
+            }
+            return "\(date.formatted(.dateTime.month().day())) \(Self.timeTitle(for: date))"
         case .daily:
             return "每天 \(Self.timeTitle(minuteOfDay: reminder.minuteOfDay))"
         }
@@ -223,7 +231,8 @@ struct TaskRowView: View {
 }
 
 private enum TaskReminderEditMode: String, CaseIterable, Identifiable {
-    case today = "今天"
+    case countdown = "倒计时"
+    case date = "日期"
     case daily = "每天"
 
     var id: String { rawValue }
@@ -237,6 +246,8 @@ private struct TaskReminderEditor: View {
     @State private var mode: TaskReminderEditMode
     @State private var hour: Int
     @State private var minute: Int
+    @State private var dayOffset: Int
+    @State private var countdownMinutes = 10
 
     init(
         reminder: TaskReminder?,
@@ -253,16 +264,23 @@ private struct TaskReminderEditor: View {
             initialMode = .daily
             initialMinuteOfDay = reminder?.minuteOfDay ?? Self.nearestUpcomingMinute()
         case .once:
-            initialMode = .today
+            initialMode = .date
             initialMinuteOfDay = reminder?.date.map(Self.minuteOfDay) ??
                 Self.nearestUpcomingMinute()
         case nil:
-            initialMode = .today
+            initialMode = .countdown
             initialMinuteOfDay = Self.nearestUpcomingMinute()
         }
         _mode = State(initialValue: initialMode)
         _hour = State(initialValue: initialMinuteOfDay / 60)
         _minute = State(initialValue: initialMinuteOfDay % 60)
+        let reminderDay = reminder?.date ?? Date()
+        let days = Calendar.current.dateComponents(
+            [.day],
+            from: Calendar.current.startOfDay(for: Date()),
+            to: Calendar.current.startOfDay(for: reminderDay)
+        ).day ?? 0
+        _dayOffset = State(initialValue: min(max(days, 0), 7))
     }
 
     var body: some View {
@@ -278,7 +296,25 @@ private struct TaskReminderEditor: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            HStack(spacing: 8) {
+            if mode == .countdown {
+                ReminderTimeDropdown(
+                    title: "\(countdownMinutes) 分钟后",
+                    values: stride(from: 10, through: 120, by: 10).map { $0 },
+                    selectedValue: countdownMinutes,
+                    titleForValue: { "\($0) 分钟后" },
+                    onSelect: { countdownMinutes = $0 }
+                )
+            } else {
+                if mode == .date {
+                    ReminderTimeDropdown(
+                        title: Self.dayTitle(offset: dayOffset),
+                        values: Array(0...7),
+                        selectedValue: dayOffset,
+                        titleForValue: Self.dayTitle(offset:),
+                        onSelect: { dayOffset = $0 }
+                    )
+                }
+                HStack(spacing: 8) {
                 ReminderTimeDropdown(
                     title: String(format: "%02d 时", hour),
                     values: Array(0...23),
@@ -293,6 +329,7 @@ private struct TaskReminderEditor: View {
                     titleForValue: { String(format: "%02d 分", $0) },
                     onSelect: { minute = $0 }
                 )
+                }
             }
 
             HStack {
@@ -316,12 +353,16 @@ private struct TaskReminderEditor: View {
     }
 
     private var saveDisabled: Bool {
-        mode == .today && todayReminderDate <= Date()
+        mode == .date && scheduledReminderDate <= Date()
     }
 
-    private var todayReminderDate: Date {
-        Calendar.current.startOfDay(for: Date())
-            .addingTimeInterval(TimeInterval(minuteOfDay * 60))
+    private var scheduledReminderDate: Date {
+        let day = Calendar.current.date(
+            byAdding: .day,
+            value: dayOffset,
+            to: Date()
+        ) ?? Date()
+        return TaskReminder.once(on: day, minuteOfDay: minuteOfDay)?.date ?? Date()
     }
 
     private var minuteOfDay: Int {
@@ -330,8 +371,10 @@ private struct TaskReminderEditor: View {
 
     private func makeReminder() -> TaskReminder {
         switch mode {
-        case .today:
-            return .once(at: todayReminderDate)
+        case .countdown:
+            return .countdown(minutes: countdownMinutes)
+        case .date:
+            return .once(at: scheduledReminderDate)
         case .daily:
             return .daily(
                 minuteOfDay: minuteOfDay,
@@ -339,6 +382,15 @@ private struct TaskReminderEditor: View {
                 lastTriggeredAt: reminder?.lastTriggeredAt
             )
         }
+    }
+
+    private static func dayTitle(offset: Int) -> String {
+        if offset == 0 { return "今天" }
+        if offset == 1 { return "明天" }
+        guard let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) else {
+            return "未来第 \(offset) 天"
+        }
+        return date.formatted(.dateTime.month().day().weekday(.abbreviated))
     }
 
     private static func nearestUpcomingMinute(now: Date = Date()) -> Int {

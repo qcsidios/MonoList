@@ -12,6 +12,7 @@ swiftc \
   "$ROOT_DIR/MonoList/App/WindowCoordinator.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskItem.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskStore.swift" \
+  "$ROOT_DIR/MonoList/Tasks/TaskDropCoordinator.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskListView.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskDraftState.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskTextEditor.swift" \

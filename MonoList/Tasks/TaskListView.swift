@@ -18,6 +18,8 @@ struct TaskListView: View {
     @State private var clearAction: ClearAction?
     @State private var currentDate = Date()
     @State private var draftFocused = false
+    @StateObject private var dropCoordinator = TaskDropCoordinator()
+    @State private var draftScrollRequest = UUID()
 
     private var todayCompleted: [TaskItem] {
         store.completedTasks(on: currentDate)
@@ -59,7 +61,7 @@ struct TaskListView: View {
             rowCount: rows,
             additionalLineCount: extraLines,
             dateHeaderCount: dateHeaders
-        )
+        ) + 58
     }
 
     private var preferredHeight: CGFloat {
@@ -146,8 +148,18 @@ struct TaskListView: View {
             header
             Divider().opacity(0.45)
             if shouldScroll {
-                ScrollView {
-                    taskContent
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        taskContent
+                    }
+                    .onChange(of: draftScrollRequest) { _, _ in
+                        DispatchQueue.main.async {
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                proxy.scrollTo("task-draft-row", anchor: .bottom)
+                            }
+                            DispatchQueue.main.async { draftFocused = true }
+                        }
+                    }
                 }
                 .scrollBounceBehavior(.always, axes: .vertical)
             } else {
@@ -161,17 +173,15 @@ struct TaskListView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) {
-                    focusDraft(after: store.pendingTasks.last?.id)
+                    focusDraft(after: store.shortTermTasks.last?.id)
                 }
                 .onTapGesture {
                     clearFocus()
                 }
 
             VStack(spacing: 2) {
-                pendingRows
-                if draftState.isPresented && draftState.afterID == nil {
-                    draftRow
-                }
+                taskGroupSection(.shortTerm, title: "短期任务")
+                taskGroupSection(.longTerm, title: "长期任务")
                 completedSection
             }
             .padding(.horizontal, 7)
@@ -200,7 +210,7 @@ struct TaskListView: View {
 
             Button {
                 commitDraft()
-                focusDraft(after: store.pendingTasks.last?.id)
+                focusDraft(after: store.shortTermTasks.last?.id)
             } label: {
                 HeaderIconLabel(systemName: "plus")
             }
@@ -243,9 +253,40 @@ struct TaskListView: View {
         .frame(height: 54)
     }
 
+    private func tasks(in group: TaskGroup) -> [TaskItem] {
+        group == .shortTerm ? store.shortTermTasks : store.longTermTasks
+    }
+
     @ViewBuilder
-    private var pendingRows: some View {
-        ForEach(store.pendingTasks) { item in
+    private func taskGroupSection(_ group: TaskGroup, title: String) -> some View {
+        let groupTasks = tasks(in: group)
+        HStack {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("\(groupTasks.count)")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.tertiary)
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 29)
+        .contentShape(Rectangle())
+        .background(
+            dropCoordinator.target?.group == group
+                ? Color.accentColor.opacity(0.08)
+                : Color.clear,
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+        .onDrop(of: [UTType.text], delegate: TaskGroupDropDelegate(
+            group: group,
+            beforeID: nil,
+            store: store,
+            coordinator: dropCoordinator,
+            errorMessage: $errorMessage
+        ))
+
+        ForEach(groupTasks) { item in
             TaskRowView(
                 item: item,
                 onSave: perform { text in
@@ -263,10 +304,17 @@ struct TaskListView: View {
                 onMoveUp: perform { try store.move(id: item.id, by: -1) },
                 onMoveDown: perform { try store.move(id: item.id, by: 1) },
                 onInsertAfter: {
-                    focusDraft(after: item.id)
+                    focusDraft(after: item.id, in: item.group)
                 },
                 onUpdateReminder: perform { reminder in
                     try store.updateReminder(id: item.id, reminder: reminder)
+                },
+                onChangeGroup: perform {
+                    try store.move(
+                        id: item.id,
+                        to: item.group == .shortTerm ? .longTerm : .shortTerm,
+                        before: nil
+                    )
                 },
                 isSelected: selectedTaskID == item.id,
                 onSelect: { selectTask(item.id) },
@@ -281,9 +329,11 @@ struct TaskListView: View {
             }
             .onDrop(
                 of: [UTType.text],
-                delegate: TaskDropDelegate(
-                    destinationID: item.id,
+                delegate: TaskGroupDropDelegate(
+                    group: group,
+                    beforeID: item.id,
                     store: store,
+                    coordinator: dropCoordinator,
                     errorMessage: $errorMessage
                 )
             )
@@ -292,6 +342,9 @@ struct TaskListView: View {
                 draftRow
                     .id("task-draft-row")
             }
+        }
+        if draftState.isPresented && draftState.group == group && draftState.afterID == nil {
+            draftRow.id("task-draft-row")
         }
     }
 
@@ -400,6 +453,7 @@ struct TaskListView: View {
             _ = try draftState.submitAndContinue(to: store)
             selectedTaskID = nil
             editingTaskID = nil
+            draftScrollRequest = UUID()
             DispatchQueue.main.async {
                 draftFocused = true
             }
@@ -416,10 +470,11 @@ struct TaskListView: View {
         NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
-    private func focusDraft(after id: UUID?) {
+    private func focusDraft(after id: UUID?, in group: TaskGroup = .shortTerm) {
         selectedTaskID = nil
         editingTaskID = nil
-        draftState.present(after: id)
+        draftState.present(after: id, in: group)
+        draftScrollRequest = UUID()
         DispatchQueue.main.async {
             selectedTaskID = nil
             editingTaskID = nil
@@ -623,39 +678,41 @@ private enum ClearAction {
     }
 }
 
-private struct TaskDropDelegate: DropDelegate {
-    let destinationID: UUID
+private struct TaskGroupDropDelegate: DropDelegate {
+    let group: TaskGroup
+    let beforeID: UUID?
     let store: TaskStore
+    let coordinator: TaskDropCoordinator
     @Binding var errorMessage: String?
 
     func dropEntered(info: DropInfo) {
-        guard let provider = info.itemProviders(for: [UTType.text]).first else { return }
+        coordinator.hover(group: group, before: beforeID)
+    }
+
+    func dropExited(info: DropInfo) {
+        coordinator.cancel()
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let provider = info.itemProviders(for: [UTType.text]).first else {
+            return false
+        }
         provider.loadObject(ofClass: NSString.self) { object, _ in
             guard let value = object as? NSString,
                   let sourceID = UUID(uuidString: value as String) else { return }
             Task { @MainActor in
-                var ids = store.pendingTasks.map(\.id)
-                guard let source = ids.firstIndex(of: sourceID),
-                      let destination = ids.firstIndex(of: destinationID),
-                      source != destination else { return }
-                ids.move(
-                    fromOffsets: IndexSet(integer: source),
-                    toOffset: destination > source ? destination + 1 : destination
-                )
                 do {
                     try withAnimation(
                         .interactiveSpring(response: 0.22, dampingFraction: 0.88)
                     ) {
-                        try store.reorder(ids: ids)
+                        coordinator.hover(group: group, before: beforeID)
+                        try coordinator.performDrop(sourceID: sourceID, store: store)
                     }
                 } catch {
                     errorMessage = error.localizedDescription
                 }
             }
         }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        true
+        return true
     }
 }

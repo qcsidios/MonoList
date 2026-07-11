@@ -131,6 +131,7 @@ struct ReminderSchedulerSmoke {
         let testTasks = ReminderPanelController.tasksForTest([])
         precondition(testTasks.count == 1)
         precondition(testTasks[0].text == "这是一次轻提醒测试")
+        precondition(ReminderPanelController.resolvedSoundName("不存在的声音") == "Glass")
 
         let finalFrame = NSRect(x: 400, y: 500, width: 340, height: 180)
         let startFrame = ReminderPanelController.presentationStartFrame(
@@ -158,22 +159,23 @@ struct ReminderSchedulerSmoke {
             return
         }
 
-        var soundCount = 0
-        let controller = ReminderPanelController(playSound: { soundCount += 1 })
+        var playedSounds: [String] = []
+        let controller = ReminderPanelController(playSound: { playedSounds.append($0) })
         controller.show(
             tasks: testTasks,
             position: .topCenter,
             menuBarButton: nil,
             testing: true,
+            soundName: "Ping",
             onOpen: {},
             onClose: {}
         )
         precondition(controller.isTesting)
         precondition((controller.currentPanelHeight ?? 0) < 110)
-        precondition(soundCount == 1)
+        precondition(playedSounds == ["Ping"])
         controller.close(animated: false)
         precondition(!controller.isTesting)
-        precondition(soundCount == 1)
+        precondition(playedSounds == ["Ping"])
         controller.show(
             tasks: testTasks,
             position: .topCenter,
@@ -183,7 +185,7 @@ struct ReminderSchedulerSmoke {
             onOpen: {},
             onClose: {}
         )
-        precondition(soundCount == 1)
+        precondition(playedSounds == ["Ping"])
         controller.close(animated: false)
 
         print("Reminder scheduler smoke passed.")

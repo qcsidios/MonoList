@@ -68,6 +68,28 @@ if ! grep -q 'ReminderTimeDropdown' "$TASK_ROW" ||
   exit 1
 fi
 
+if ! grep -q 'ScrollViewReader' "$TASK_LIST" ||
+   ! grep -q 'scrollTo("task-draft-row"' "$TASK_LIST"; then
+  echo "长列表新增待办必须自动滚动到草稿输入行。" >&2
+  exit 1
+fi
+
+CONTINUE_DRAFT_BLOCK="$(awk '
+  /private func continueDraft\(\)/ { capture = 1 }
+  /private func selectTask/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+if ! echo "$CONTINUE_DRAFT_BLOCK" | grep -q 'draftScrollRequest = UUID()'; then
+  echo "连续新增待办时必须再次滚动到草稿输入行。" >&2
+  exit 1
+fi
+
+if ! grep -q 'func dropExited' "$TASK_LIST" ||
+   ! grep -q 'coordinator.cancel()' "$TASK_LIST"; then
+  echo "取消或移出拖拽目标时必须清除分组落点状态。" >&2
+  exit 1
+fi
+
 if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDOW_COORDINATOR"; then
   echo "点击提醒浮层、菜单或下拉时不应被误判为主窗口外点击。" >&2
   exit 1

@@ -43,11 +43,22 @@ final class TaskStore: ObservableObject {
         tasks
             .filter { $0.status == .pending }
             .sorted {
+                if $0.group != $1.group {
+                    return $0.group == .shortTerm
+                }
                 if $0.order != $1.order {
                     return $0.order < $1.order
                 }
                 return $0.id.uuidString < $1.id.uuidString
             }
+    }
+
+    var shortTermTasks: [TaskItem] {
+        pendingTasks.filter { $0.group == .shortTerm }
+    }
+
+    var longTermTasks: [TaskItem] {
+        pendingTasks.filter { $0.group == .longTerm }
     }
 
     var historyTasks: [TaskItem] {
@@ -92,6 +103,7 @@ final class TaskStore: ObservableObject {
     func add(
         text: String,
         after previousID: UUID? = nil,
+        group: TaskGroup = .shortTerm,
         id: UUID = UUID(),
         createdAt: Date = Date()
     ) throws -> TaskItem {
@@ -101,7 +113,7 @@ final class TaskStore: ObservableObject {
         }
 
         var candidate = tasks
-        var pending = pendingTasks
+        var pending = tasks(in: group)
         let insertionIndex: Int
         if let previousID,
            let previousIndex = pending.firstIndex(where: { $0.id == previousID }) {
@@ -117,11 +129,12 @@ final class TaskStore: ObservableObject {
             order: insertionIndex,
             createdAt: createdAt,
             updatedAt: createdAt,
-            completedAt: nil
+            completedAt: nil,
+            group: group
         )
         pending.insert(item, at: insertionIndex)
         normalizeOrders(in: &pending)
-        candidate.removeAll { $0.status == .pending }
+        candidate.removeAll { $0.status == .pending && $0.group == group }
         candidate.append(contentsOf: pending)
         try commit(candidate)
         return item
@@ -250,7 +263,8 @@ final class TaskStore: ObservableObject {
                 createdAt: date,
                 updatedAt: date,
                 completedAt: nil,
-                reminder: reminder
+                reminder: reminder,
+                group: source.group
             )
             pending.append(item)
             didChange = true
@@ -269,7 +283,10 @@ final class TaskStore: ObservableObject {
             return
         }
 
-        var pending = pendingTasks
+        guard let group = tasks.first(where: { $0.id == id })?.group else {
+            throw TaskStoreError.missingTask
+        }
+        var pending = tasks(in: group)
         guard let sourceIndex = pending.firstIndex(where: { $0.id == id }) else {
             throw TaskStoreError.missingTask
         }
@@ -283,8 +300,39 @@ final class TaskStore: ObservableObject {
         pending.insert(item, at: destinationIndex)
         normalizeOrders(in: &pending)
 
-        var candidate = tasks.filter { $0.status != .pending }
+        var candidate = tasks.filter { !($0.status == .pending && $0.group == group) }
         candidate.append(contentsOf: pending)
+        try commit(candidate)
+    }
+
+    func move(id: UUID, to group: TaskGroup, before destinationID: UUID?) throws {
+        try guardAvailable()
+        if destinationID == id { return }
+        guard let item = tasks.first(where: { $0.id == id && $0.status == .pending }) else {
+            throw TaskStoreError.missingTask
+        }
+        var sourceGroup = tasks(in: item.group).filter { $0.id != id }
+        var destinationGroup = item.group == group ? sourceGroup : tasks(in: group)
+        var moved = item
+        moved.group = group
+        let insertionIndex = destinationID.flatMap { destinationID in
+            destinationGroup.firstIndex(where: { $0.id == destinationID })
+        } ?? destinationGroup.endIndex
+        destinationGroup.insert(moved, at: insertionIndex)
+        normalizeOrders(in: &destinationGroup)
+        if item.group != group {
+            normalizeOrders(in: &sourceGroup)
+        }
+        var candidate = tasks.filter { $0.status != .pending }
+        for candidateGroup in TaskGroup.allCases {
+            if candidateGroup == group {
+                candidate.append(contentsOf: destinationGroup)
+            } else if candidateGroup == item.group {
+                candidate.append(contentsOf: sourceGroup)
+            } else {
+                candidate.append(contentsOf: tasks(in: candidateGroup))
+            }
+        }
         try commit(candidate)
     }
 
@@ -491,5 +539,9 @@ final class TaskStore: ObservableObject {
         for index in pending.indices {
             pending[index].order = index
         }
+    }
+
+    private func tasks(in group: TaskGroup) -> [TaskItem] {
+        pendingTasks.filter { $0.group == group }
     }
 }

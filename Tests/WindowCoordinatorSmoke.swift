@@ -133,7 +133,7 @@ struct WindowCoordinatorSmoke {
             taskListSource.contains("private func selectTask(_ id: UUID)")
         )
         precondition(
-            taskListSource.contains("private func focusDraft(after id: UUID?)")
+            taskListSource.contains("private func focusDraft(after id: UUID?, in group: TaskGroup")
         )
         precondition(
             taskListSource.contains("TaskDragPreview()")

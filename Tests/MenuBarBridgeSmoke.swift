@@ -5,8 +5,8 @@ struct MenuBarBridgeSmoke {
     static func main() {
         precondition(MenuBarBridgeProtocol.helperBundleIdentifier ==
             "com.qingcheng.monolist.menubar")
-        precondition(MenuBarBridgeProtocol.title(pendingCount: 0) == "待办")
-        precondition(MenuBarBridgeProtocol.title(pendingCount: 3) == "待办 3")
+        precondition(MenuBarBridgeProtocol.title(pendingCount: 0).isEmpty)
+        precondition(MenuBarBridgeProtocol.title(pendingCount: 3) == "3")
         precondition(MenuBarBridgeProtocol.showMainPanel.rawValue.hasPrefix(
             "com.qingcheng.monolist."
         ))

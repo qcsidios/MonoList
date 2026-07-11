@@ -105,15 +105,22 @@ struct SettingsView: View {
                 .toggleStyle(SettingsSwitchStyle())
             }
             settingsRow("提醒声音") {
-                Toggle(
-                    "",
-                    isOn: binding(
-                        get: { settings.reminderSoundEnabled },
-                        update: { $0.reminderSoundEnabled = $1 }
-                    )
-                )
-                .labelsHidden()
-                .toggleStyle(SettingsSwitchStyle())
+                SettingsPopupButton(
+                    items: ["关闭"] + Self.systemSoundNames,
+                    selectedTitle: settings.reminderSoundEnabled
+                        ? settings.reminderSoundName
+                        : "关闭"
+                ) { title in
+                    updateSettings {
+                        $0.reminderSoundEnabled = title != "关闭"
+                        if title != "关闭" { $0.reminderSoundName = title }
+                    }
+                    if title != "关闭" {
+                        (NSSound(named: NSSound.Name(title)) ??
+                            NSSound(named: NSSound.Name("Glass")))?.play()
+                    }
+                }
+                .frame(width: Self.controlWidth, height: Self.controlHeight)
             }
             Divider().opacity(0.4)
             settingsRow("提醒时段") {
@@ -204,6 +211,11 @@ struct SettingsView: View {
             }
         }
     }
+
+    private static let systemSoundNames = [
+        "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero",
+        "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink",
+    ].filter { NSSound(named: NSSound.Name($0)) != nil }
 
     private var startupSettings: some View {
         settingsRow("开机后自动启动") {

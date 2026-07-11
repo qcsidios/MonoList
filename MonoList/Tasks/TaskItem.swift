@@ -5,6 +5,11 @@ enum TaskStatus: String, Codable {
     case history
 }
 
+enum TaskGroup: String, Codable, CaseIterable {
+    case shortTerm
+    case longTerm
+}
+
 enum TaskReminderKind: String, Codable {
     case once
     case daily
@@ -25,6 +30,25 @@ struct TaskReminder: Codable, Equatable {
             recurrenceID: nil,
             lastTriggeredAt: nil
         )
+    }
+
+    static func countdown(minutes: Int, from date: Date = Date()) -> TaskReminder {
+        .once(at: date.addingTimeInterval(TimeInterval(minutes * 60)))
+    }
+
+    static func once(
+        on day: Date,
+        minuteOfDay: Int,
+        calendar: Calendar = .current
+    ) -> TaskReminder? {
+        guard (0..<24 * 60).contains(minuteOfDay) else { return nil }
+        let startOfDay = calendar.startOfDay(for: day)
+        guard let date = calendar.date(
+            byAdding: .minute,
+            value: minuteOfDay,
+            to: startOfDay
+        ) else { return nil }
+        return .once(at: date)
     }
 
     static func daily(
@@ -51,6 +75,46 @@ struct TaskItem: Identifiable, Codable, Equatable {
     var updatedAt: Date
     var completedAt: Date?
     var reminder: TaskReminder? = nil
+    var group: TaskGroup = .shortTerm
+
+    private enum CodingKeys: String, CodingKey {
+        case id, text, status, order, createdAt, updatedAt, completedAt, reminder, group
+    }
+
+    init(
+        id: UUID,
+        text: String,
+        status: TaskStatus,
+        order: Int,
+        createdAt: Date,
+        updatedAt: Date,
+        completedAt: Date?,
+        reminder: TaskReminder? = nil,
+        group: TaskGroup = .shortTerm
+    ) {
+        self.id = id
+        self.text = text
+        self.status = status
+        self.order = order
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.completedAt = completedAt
+        self.reminder = reminder
+        self.group = group
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        text = try container.decode(String.self, forKey: .text)
+        status = try container.decode(TaskStatus.self, forKey: .status)
+        order = try container.decode(Int.self, forKey: .order)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        reminder = try container.decodeIfPresent(TaskReminder.self, forKey: .reminder)
+        group = try container.decodeIfPresent(TaskGroup.self, forKey: .group) ?? .shortTerm
+    }
 }
 
 struct TaskDatabase: Codable, Equatable {

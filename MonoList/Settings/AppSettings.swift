@@ -63,6 +63,7 @@ struct SettingsValues: Codable, Equatable {
     var reminderEndMinuteOfDay = 22 * 60
     var reminderPosition = ReminderPosition.topCenter
     var reminderSoundEnabled: Bool? = true
+    var reminderSoundName = "Glass"
     var launchAtLogin = false
     var globalShortcut: ShortcutDefinition?
     var lastAutomaticUpdateCheckAt: Date?
@@ -76,6 +77,7 @@ struct SettingsValues: Codable, Equatable {
         case reminderEndMinuteOfDay
         case reminderPosition
         case reminderSoundEnabled
+        case reminderSoundName
         case launchAtLogin
         case globalShortcut
         case lastAutomaticUpdateCheckAt
@@ -107,6 +109,10 @@ struct SettingsValues: Codable, Equatable {
             Bool.self,
             forKey: .reminderSoundEnabled
         ) ?? true
+        reminderSoundName = try container.decodeIfPresent(
+            String.self,
+            forKey: .reminderSoundName
+        ) ?? "Glass"
         launchAtLogin = try container.decodeIfPresent(
             Bool.self,
             forKey: .launchAtLogin
@@ -149,6 +155,7 @@ final class AppSettings: ObservableObject {
     var reminderEndMinuteOfDay: Int { values.reminderEndMinuteOfDay }
     var reminderPosition: ReminderPosition { values.reminderPosition }
     var reminderSoundEnabled: Bool { values.reminderSoundEnabled ?? true }
+    var reminderSoundName: String { values.reminderSoundName }
     var launchAtLogin: Bool { values.launchAtLogin }
     var globalShortcut: ShortcutDefinition? { values.globalShortcut }
     var lastAutomaticUpdateCheckAt: Date? { values.lastAutomaticUpdateCheckAt }
