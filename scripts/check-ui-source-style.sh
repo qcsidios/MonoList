@@ -85,7 +85,7 @@ if ! echo "$CONTINUE_DRAFT_BLOCK" | grep -q 'draftScrollRequest = UUID()'; then
 fi
 
 if ! grep -q 'func dropExited' "$TASK_LIST" ||
-   ! grep -q 'coordinator.cancel()' "$TASK_LIST"; then
+   ! grep -q 'coordinator.clearTarget()' "$TASK_LIST"; then
   echo "取消或移出拖拽目标时必须清除分组落点状态。" >&2
   exit 1
 fi

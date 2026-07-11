@@ -259,7 +259,7 @@ struct TaskListView: View {
 
     @ViewBuilder
     private func taskGroupSection(_ group: TaskGroup, title: String) -> some View {
-        let groupTasks = tasks(in: group)
+        let groupTasks = dropCoordinator.previewTasks(tasks(in: group), in: group)
         HStack {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
@@ -323,7 +323,8 @@ struct TaskListView: View {
                 }
             )
             .onDrag {
-                NSItemProvider(object: item.id.uuidString as NSString)
+                dropCoordinator.beginDragging(task: item)
+                return NSItemProvider(object: item.id.uuidString as NSString)
             } preview: {
                 TaskDragPreview()
             }
@@ -686,11 +687,15 @@ private struct TaskGroupDropDelegate: DropDelegate {
     @Binding var errorMessage: String?
 
     func dropEntered(info: DropInfo) {
-        coordinator.hover(group: group, before: beforeID)
+        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.88)) {
+            coordinator.hover(group: group, before: beforeID)
+        }
     }
 
     func dropExited(info: DropInfo) {
-        coordinator.cancel()
+        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.88)) {
+            coordinator.clearTarget()
+        }
     }
 
     func performDrop(info: DropInfo) -> Bool {
