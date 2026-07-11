@@ -20,6 +20,7 @@ struct TaskListView: View {
     @State private var draftFocused = false
     @StateObject private var dropCoordinator = TaskDropCoordinator()
     @State private var draftScrollRequest = UUID()
+    @State private var taskRowHeights: [UUID: CGFloat] = [:]
 
     private var todayCompleted: [TaskItem] {
         store.completedTasks(on: currentDate)
@@ -179,7 +180,7 @@ struct TaskListView: View {
                     clearFocus()
                 }
 
-            VStack(spacing: 2) {
+            VStack(spacing: 0) {
                 taskGroupSection(.shortTerm, title: "短期任务")
                 taskGroupSection(.longTerm, title: "长期任务")
                 completedSection
@@ -188,6 +189,9 @@ struct TaskListView: View {
             .padding(.top, 7)
             .padding(.bottom, 7)
             .frame(maxWidth: .infinity, alignment: .top)
+            .onPreferenceChange(TaskRowHeightPreferenceKey.self) { heights in
+                taskRowHeights = heights
+            }
         }
     }
 
@@ -259,7 +263,7 @@ struct TaskListView: View {
 
     @ViewBuilder
     private func taskGroupSection(_ group: TaskGroup, title: String) -> some View {
-        let groupTasks = dropCoordinator.previewTasks(tasks(in: group), in: group)
+        let groupTasks = tasks(in: group)
         HStack {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
@@ -280,13 +284,15 @@ struct TaskListView: View {
         )
         .onDrop(of: [UTType.text], delegate: TaskGroupDropDelegate(
             group: group,
-            beforeID: nil,
+            upperBeforeID: nil,
+            lowerBeforeID: nil,
+            rowHeight: 29,
             store: store,
             coordinator: dropCoordinator,
             errorMessage: $errorMessage
         ))
 
-        ForEach(groupTasks) { item in
+        ForEach(Array(groupTasks.enumerated()), id: \.element.id) { index, item in
             TaskRowView(
                 item: item,
                 onSave: perform { text in
@@ -322,17 +328,46 @@ struct TaskListView: View {
                     editingTaskID = editing ? item.id : nil
                 }
             )
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: TaskRowHeightPreferenceKey.self,
+                        value: [item.id: proxy.size.height]
+                    )
+                }
+            }
+            .overlay(alignment: .top) {
+                if dropCoordinator.target == TaskDropTarget(
+                    group: group,
+                    beforeID: item.id
+                ) {
+                    TaskDragInsertionIndicator()
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if index == groupTasks.count - 1,
+                   dropCoordinator.target == TaskDropTarget(
+                       group: group,
+                       beforeID: nil
+                   ) {
+                    TaskDragInsertionIndicator()
+                }
+            }
             .onDrag {
                 dropCoordinator.beginDragging(task: item)
                 return NSItemProvider(object: item.id.uuidString as NSString)
             } preview: {
-                TaskDragPreview()
+                TaskDragPreview(text: item.text)
             }
             .onDrop(
                 of: [UTType.text],
                 delegate: TaskGroupDropDelegate(
                     group: group,
-                    beforeID: item.id,
+                    upperBeforeID: item.id,
+                    lowerBeforeID: groupTasks.indices.contains(index + 1)
+                        ? groupTasks[index + 1].id
+                        : nil,
+                    rowHeight: taskRowHeights[item.id] ?? 36,
                     store: store,
                     coordinator: dropCoordinator,
                     errorMessage: $errorMessage
@@ -340,13 +375,34 @@ struct TaskListView: View {
             )
 
             if draftState.isPresented && draftState.afterID == item.id {
-                draftRow
-                    .id("task-draft-row")
+                draftDropRow(
+                    group: group,
+                    beforeID: groupTasks.indices.contains(index + 1)
+                        ? groupTasks[index + 1].id
+                        : nil
+                )
             }
         }
         if draftState.isPresented && draftState.group == group && draftState.afterID == nil {
-            draftRow.id("task-draft-row")
+            draftDropRow(group: group, beforeID: nil)
         }
+    }
+
+    private func draftDropRow(group: TaskGroup, beforeID: UUID?) -> some View {
+        draftRow
+            .id("task-draft-row")
+            .onDrop(
+                of: [UTType.text],
+                delegate: TaskGroupDropDelegate(
+                    group: group,
+                    upperBeforeID: beforeID,
+                    lowerBeforeID: beforeID,
+                    rowHeight: 36,
+                    store: store,
+                    coordinator: dropCoordinator,
+                    errorMessage: $errorMessage
+                )
+            )
     }
 
     private var draftRow: some View {
@@ -579,9 +635,46 @@ private struct HeaderIconLabel: View {
 }
 
 private struct TaskDragPreview: View {
+    let text: String
+
     var body: some View {
-        Color.clear
-            .frame(width: 1, height: 1)
+        HStack(spacing: 9) {
+            Image(systemName: "circle")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+            Text(text)
+                .font(.system(size: 13))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Color.clear.frame(width: 28, height: 28)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .frame(width: 300)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 9))
+        .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
+    }
+}
+
+private struct TaskDragInsertionIndicator: View {
+    var body: some View {
+        Capsule()
+            .fill(Color.accentColor.opacity(0.72))
+            .frame(height: 2)
+            .padding(.horizontal, 8)
+            .transition(.opacity)
+    }
+}
+
+private struct TaskRowHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: [UUID: CGFloat] = [:]
+
+    static func reduce(
+        value: inout [UUID: CGFloat],
+        nextValue: () -> [UUID: CGFloat]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
     }
 }
 
@@ -681,19 +774,24 @@ private enum ClearAction {
 
 private struct TaskGroupDropDelegate: DropDelegate {
     let group: TaskGroup
-    let beforeID: UUID?
+    let upperBeforeID: UUID?
+    let lowerBeforeID: UUID?
+    let rowHeight: CGFloat
     let store: TaskStore
     let coordinator: TaskDropCoordinator
     @Binding var errorMessage: String?
 
     func dropEntered(info: DropInfo) {
-        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.88)) {
-            coordinator.hover(group: group, before: beforeID)
-        }
+        updateTarget(info)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        updateTarget(info)
+        return DropProposal(operation: .move)
     }
 
     func dropExited(info: DropInfo) {
-        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.88)) {
+        withAnimation(.easeOut(duration: 0.16)) {
             coordinator.clearTarget()
         }
     }
@@ -708,9 +806,9 @@ private struct TaskGroupDropDelegate: DropDelegate {
             Task { @MainActor in
                 do {
                     try withAnimation(
-                        .interactiveSpring(response: 0.22, dampingFraction: 0.88)
+                        .easeOut(duration: 0.16)
                     ) {
-                        coordinator.hover(group: group, before: beforeID)
+                        updateTarget(info)
                         try coordinator.performDrop(sourceID: sourceID, store: store)
                     }
                 } catch {
@@ -719,5 +817,19 @@ private struct TaskGroupDropDelegate: DropDelegate {
             }
         }
         return true
+    }
+
+    private func updateTarget(_ info: DropInfo) {
+        let target = coordinator.dropTarget(
+            group: group,
+            upperBeforeID: upperBeforeID,
+            lowerBeforeID: lowerBeforeID,
+            locationY: info.location.y,
+            rowHeight: rowHeight
+        )
+        guard coordinator.target != target else { return }
+        withAnimation(.easeOut(duration: 0.16)) {
+            coordinator.hover(group: target.group, before: target.beforeID)
+        }
     }
 }

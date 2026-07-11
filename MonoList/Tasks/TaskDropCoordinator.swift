@@ -20,6 +20,19 @@ final class TaskDropCoordinator: ObservableObject {
         target = TaskDropTarget(group: group, beforeID: destinationID)
     }
 
+    func dropTarget(
+        group: TaskGroup,
+        upperBeforeID: UUID?,
+        lowerBeforeID: UUID?,
+        locationY: CGFloat,
+        rowHeight: CGFloat
+    ) -> TaskDropTarget {
+        TaskDropTarget(
+            group: group,
+            beforeID: locationY < rowHeight / 2 ? upperBeforeID : lowerBeforeID
+        )
+    }
+
     func cancel() {
         target = nil
         sourceTask = nil
@@ -27,20 +40,6 @@ final class TaskDropCoordinator: ObservableObject {
 
     func clearTarget() {
         target = nil
-    }
-
-    func previewTasks(_ tasks: [TaskItem], in group: TaskGroup) -> [TaskItem] {
-        guard let sourceTask, let target else { return tasks }
-        if target.beforeID == sourceTask.id { return tasks }
-        var preview = tasks.filter { $0.id != sourceTask.id }
-        guard target.group == group else { return preview }
-        var moved = sourceTask
-        moved.group = group
-        let index = target.beforeID.flatMap { destinationID in
-            preview.firstIndex(where: { $0.id == destinationID })
-        } ?? preview.endIndex
-        preview.insert(moved, at: index)
-        return preview
     }
 
     func performDrop(sourceID: UUID, store: TaskStore) throws {

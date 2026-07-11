@@ -90,6 +90,43 @@ if ! grep -q 'func dropExited' "$TASK_LIST" ||
   exit 1
 fi
 
+if ! grep -q 'DropProposal(operation: .move)' "$TASK_LIST"; then
+  echo "待办拖动必须声明 move 操作，不能显示复制用的加号光标。" >&2
+  exit 1
+fi
+
+if grep -A8 'private struct TaskDragPreview' "$TASK_LIST" |
+   grep -q 'Color.clear'; then
+  echo "拖动预览不能是透明占位，必须让待办内容跟随鼠标。" >&2
+  exit 1
+fi
+
+if ! grep -q 'TaskDragInsertionIndicator' "$TASK_LIST"; then
+  echo "拖动时必须显示稳定插入位置。" >&2
+  exit 1
+fi
+
+if grep -q 'dropCoordinator.sourceTask?.id == item.id' "$TASK_LIST"; then
+  echo "源待办行不能依赖缺少取消回调的透明状态。" >&2
+  exit 1
+fi
+
+if ! grep -q 'VStack(spacing: 0)' "$TASK_LIST"; then
+  echo "待办拖放目标之间不能保留会闪现加号光标的空隙。" >&2
+  exit 1
+fi
+
+if ! grep -q 'TaskRowHeightPreferenceKey' "$TASK_LIST" ||
+   ! grep -q 'taskRowHeights\[item.id\]' "$TASK_LIST"; then
+  echo "拖动命中必须使用待办行真实高度，不能用文本行数估算。" >&2
+  exit 1
+fi
+
+if ! grep -q 'draftDropRow(group:' "$TASK_LIST"; then
+  echo "草稿输入行必须接管 move 拖放，不能形成加号光标断层。" >&2
+  exit 1
+fi
+
 if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDOW_COORDINATOR"; then
   echo "点击提醒浮层、菜单或下拉时不应被误判为主窗口外点击。" >&2
   exit 1

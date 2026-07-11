@@ -136,10 +136,10 @@ struct WindowCoordinatorSmoke {
             taskListSource.contains("private func focusDraft(after id: UUID?, in group: TaskGroup")
         )
         precondition(
-            taskListSource.contains("TaskDragPreview()")
+            taskListSource.contains("TaskDragPreview(text:")
         )
         precondition(taskListSource.contains("withAnimation("))
-        precondition(taskListSource.contains(".interactiveSpring"))
+        precondition(taskListSource.contains(".easeOut(duration: 0.16)"))
         let headerIconStart = taskListSource.range(
             of: "private struct HeaderIconLabel"
         )
