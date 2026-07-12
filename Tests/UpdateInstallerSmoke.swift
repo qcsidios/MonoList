@@ -18,7 +18,7 @@ struct UpdateInstallerSmoke {
         precondition(script.contains("ditto"))
         precondition(script.contains("restore_old_app"))
         precondition(script.contains("com.qingcheng.monolist.mac"))
-        precondition(script.contains("pgrep -x MonoListMenuBar"))
+        precondition(!script.contains("pgrep -x MonoListMenuBar"))
         precondition(script.contains("codesign --verify"))
         precondition(script.contains("xattr -dr com.apple.quarantine"))
         precondition(!script.contains("github.com"))

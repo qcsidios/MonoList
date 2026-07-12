@@ -14,16 +14,12 @@ CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 EXECUTABLE="$MACOS_DIR/$APP_NAME"
-HELPER_APP_DIR="$CONTENTS_DIR/Library/Helpers/MonoListMenuBar.app"
-HELPER_CONTENTS_DIR="$HELPER_APP_DIR/Contents"
-HELPER_MACOS_DIR="$HELPER_CONTENTS_DIR/MacOS"
-HELPER_EXECUTABLE="$HELPER_MACOS_DIR/MonoListMenuBar"
 CODESIGN_IDENTITY="${MONOLIST_CODESIGN_IDENTITY:-}"
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
 GENERATED_ICON="$BUILD_DIR/AppIcon.icns"
 
 rm -rf "$APP_DIR"
-mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$HELPER_MACOS_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 SWIFT_SOURCES=()
 while IFS= read -r source_file; do
@@ -35,13 +31,6 @@ swiftc \
   -target "$SWIFT_TARGET" \
   "${SWIFT_SOURCES[@]}" \
   -o "$EXECUTABLE"
-
-swiftc \
-  -O \
-  -target "$SWIFT_TARGET" \
-  "$ROOT_DIR/MonoList/App/MenuBarBridgeProtocol.swift" \
-  "$ROOT_DIR/MenuBarHelper/main.swift" \
-  -o "$HELPER_EXECUTABLE"
 
 rm -rf "$ICONSET_DIR" "$GENERATED_ICON"
 swift "$ROOT_DIR/scripts/generate-app-icon.swift" "$ICONSET_DIR"
@@ -76,49 +65,17 @@ $ICON_PLIST
     <key>LSMinimumSystemVersion</key>
     <string>$MIN_MACOS_VERSION</string>
     <key>LSUIElement</key>
-    <false/>
+    <true/>
 </dict>
 </plist>
 PLIST
 
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
-cat > "$HELPER_CONTENTS_DIR/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDisplayName</key>
-    <string>MonoList Menu Bar</string>
-    <key>CFBundleExecutable</key>
-    <string>MonoListMenuBar</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.qingcheng.monolist.menubar</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>MonoList Menu Bar</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>$BUNDLE_SHORT_VERSION</string>
-    <key>CFBundleVersion</key>
-    <string>$APP_BUILD</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>$MIN_MACOS_VERSION</string>
-    <key>LSUIElement</key>
-    <false/>
-</dict>
-</plist>
-PLIST
-
-printf 'APPL????' > "$HELPER_CONTENTS_DIR/PkgInfo"
-chmod +x "$EXECUTABLE" "$HELPER_EXECUTABLE"
+chmod +x "$EXECUTABLE"
 
 if [[ -n "$CODESIGN_IDENTITY" ]]; then
-  codesign --force --sign "$CODESIGN_IDENTITY" "$HELPER_APP_DIR" >/dev/null
   codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_DIR" >/dev/null
 else
-  codesign --force --sign - "$HELPER_APP_DIR" >/dev/null
   codesign --force --deep --sign - "$APP_DIR" >/dev/null
 fi
 
