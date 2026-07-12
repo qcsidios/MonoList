@@ -37,9 +37,24 @@ final class TaskDropCoordinator: ObservableObject {
         before destinationID: UUID?,
         highlightsGroupHeader: Bool = false
     ) {
+        guard sessionID != nil else { return }
         target = TaskDropTarget(
             group: group,
             beforeID: destinationID,
+            highlightsGroupHeader: highlightsGroupHeader
+        )
+    }
+
+    func hover(
+        group: TaskGroup,
+        before destinationID: UUID?,
+        highlightsGroupHeader: Bool = false,
+        sessionID expectedSessionID: UUID
+    ) {
+        guard expectedSessionID == sessionID else { return }
+        hover(
+            group: group,
+            before: destinationID,
             highlightsGroupHeader: highlightsGroupHeader
         )
     }
@@ -72,9 +87,20 @@ final class TaskDropCoordinator: ObservableObject {
         target = nil
     }
 
-    func takeTarget() -> TaskDropTarget? {
-        defer { target = nil }
+    func clearTarget(sessionID expectedSessionID: UUID) {
+        guard expectedSessionID == sessionID else { return }
+        target = nil
+    }
+
+    func finishDrop() -> TaskDropTarget? {
+        guard sessionID != nil, let target else { return nil }
+        cancel()
         return target
+    }
+
+    func finishDrop(sessionID expectedSessionID: UUID) -> TaskDropTarget? {
+        guard expectedSessionID == sessionID else { return nil }
+        return finishDrop()
     }
 
     func performDrop(sourceID: UUID, store: TaskStore) throws {

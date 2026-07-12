@@ -12,6 +12,7 @@ struct TaskDropCoordinatorSmoke {
         let long = try store.add(text: "长期", group: .longTerm)
         let coordinator = TaskDropCoordinator()
 
+        coordinator.beginDragging(task: short)
         coordinator.hover(
             group: .shortTerm,
             before: nil,
@@ -20,7 +21,7 @@ struct TaskDropCoordinatorSmoke {
         precondition(coordinator.target?.highlightsGroupHeader == true)
         coordinator.hover(group: .shortTerm, before: short.id)
         precondition(coordinator.target?.highlightsGroupHeader == false)
-        let consumedTarget = coordinator.takeTarget()
+        let consumedTarget = coordinator.finishDrop()
         precondition(consumedTarget?.beforeID == short.id)
         precondition(coordinator.target == nil)
 
@@ -31,6 +32,28 @@ struct TaskDropCoordinatorSmoke {
         precondition(coordinator.sourceTask?.id == long.id)
         coordinator.cancel(sessionID: secondSession)
         precondition(coordinator.sessionID == nil)
+
+        _ = coordinator.beginDragging(task: short)
+        coordinator.hover(group: .longTerm, before: long.id)
+        let finishedTarget = coordinator.finishDrop()
+        precondition(finishedTarget?.beforeID == long.id)
+        precondition(coordinator.target == nil)
+        precondition(coordinator.sourceTask == nil)
+        precondition(coordinator.sessionID == nil)
+        coordinator.hover(group: .shortTerm, before: short.id)
+        precondition(coordinator.target == nil)
+
+        let staleSession = coordinator.beginDragging(task: short)
+        _ = coordinator.finishDrop(sessionID: staleSession)
+        let currentSession = coordinator.beginDragging(task: long)
+        coordinator.hover(
+            group: .shortTerm,
+            before: short.id,
+            sessionID: staleSession
+        )
+        precondition(coordinator.target == nil)
+        coordinator.clearTarget(sessionID: staleSession)
+        precondition(coordinator.sessionID == currentSession)
 
         let nextID = UUID()
         precondition(
@@ -65,6 +88,7 @@ struct TaskDropCoordinatorSmoke {
         try coordinator.performDrop(sourceID: short.id, store: store)
         precondition(store.longTermTasks.map(\.id) == [short.id, long.id])
 
+        coordinator.beginDragging(task: long)
         coordinator.hover(group: .shortTerm, before: nil)
         try coordinator.performDrop(sourceID: long.id, store: store)
         precondition(store.shortTermTasks.map(\.id) == [long.id])

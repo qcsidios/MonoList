@@ -289,6 +289,7 @@ struct TaskListView: View {
             lowerBeforeID: nil,
             rowHeight: 29,
             highlightsGroupHeader: true,
+            sessionID: dropCoordinator.sessionID,
             store: store,
             coordinator: dropCoordinator,
             errorMessage: $errorMessage
@@ -371,6 +372,7 @@ struct TaskListView: View {
                         : nil,
                     rowHeight: taskRowHeights[item.id] ?? 36,
                     highlightsGroupHeader: false,
+                    sessionID: dropCoordinator.sessionID,
                     store: store,
                     coordinator: dropCoordinator,
                     errorMessage: $errorMessage
@@ -402,6 +404,7 @@ struct TaskListView: View {
                     lowerBeforeID: beforeID,
                     rowHeight: 36,
                     highlightsGroupHeader: false,
+                    sessionID: dropCoordinator.sessionID,
                     store: store,
                     coordinator: dropCoordinator,
                     errorMessage: $errorMessage
@@ -783,6 +786,7 @@ private struct TaskGroupDropDelegate: DropDelegate {
     let lowerBeforeID: UUID?
     let rowHeight: CGFloat
     let highlightsGroupHeader: Bool
+    let sessionID: UUID?
     let store: TaskStore
     let coordinator: TaskDropCoordinator
     @Binding var errorMessage: String?
@@ -797,28 +801,24 @@ private struct TaskGroupDropDelegate: DropDelegate {
     }
 
     func dropExited(info: DropInfo) {
+        guard let sessionID else { return }
         withAnimation(.easeOut(duration: 0.16)) {
-            coordinator.clearTarget()
+            coordinator.clearTarget(sessionID: sessionID)
         }
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        guard let sessionID = coordinator.sessionID else {
-            coordinator.clearTarget()
-            return false
-        }
+        guard let sessionID else { return false }
         updateTarget(info)
-        guard let target = coordinator.takeTarget() else {
-            coordinator.cancel(sessionID: sessionID)
+        guard let target = coordinator.finishDrop(sessionID: sessionID) else {
+            coordinator.clearTarget(sessionID: sessionID)
             return false
         }
         guard let provider = info.itemProviders(for: [UTType.text]).first else {
-            coordinator.cancel(sessionID: sessionID)
             return false
         }
         provider.loadObject(ofClass: NSString.self) { object, _ in
             Task { @MainActor in
-                defer { coordinator.cancel(sessionID: sessionID) }
                 guard let value = object as? NSString,
                       let sourceID = UUID(uuidString: value as String) else {
                     return
@@ -842,6 +842,7 @@ private struct TaskGroupDropDelegate: DropDelegate {
     }
 
     private func updateTarget(_ info: DropInfo) {
+        guard let sessionID else { return }
         let target = coordinator.dropTarget(
             group: group,
             upperBeforeID: upperBeforeID,
@@ -855,7 +856,8 @@ private struct TaskGroupDropDelegate: DropDelegate {
             coordinator.hover(
                 group: target.group,
                 before: target.beforeID,
-                highlightsGroupHeader: target.highlightsGroupHeader
+                highlightsGroupHeader: target.highlightsGroupHeader,
+                sessionID: sessionID
             )
         }
     }

@@ -85,7 +85,7 @@ if ! echo "$CONTINUE_DRAFT_BLOCK" | grep -q 'draftScrollRequest = UUID()'; then
 fi
 
 if ! grep -q 'func dropExited' "$TASK_LIST" ||
-   ! grep -q 'coordinator.clearTarget()' "$TASK_LIST"; then
+   ! grep -q 'coordinator.clearTarget(sessionID: sessionID)' "$TASK_LIST"; then
   echo "取消或移出拖拽目标时必须清除分组落点状态。" >&2
   exit 1
 fi
@@ -132,15 +132,15 @@ if ! grep -q 'dropCoordinator.target?.highlightsGroupHeader == true' "$TASK_LIST
   exit 1
 fi
 
-if ! grep -q 'coordinator.takeTarget()' "$TASK_LIST" ||
+if ! grep -q 'coordinator.finishDrop(sessionID: sessionID)' "$TASK_LIST" ||
    ! grep -A8 'private struct TaskDragInsertionIndicator' "$TASK_LIST" |
      grep -q 'allowsHitTesting(false)'; then
   echo "松开鼠标时必须立即清除插入线，且插入线不能拦截 drop 命中。" >&2
   exit 1
 fi
 
-if ! grep -q 'guard let sessionID = coordinator.sessionID' "$TASK_LIST"; then
-  echo "待办列表必须拒绝没有内部拖动会话的外部文本 drop。" >&2
+if ! grep -q 'guard let target = coordinator.finishDrop(sessionID: sessionID)' "$TASK_LIST"; then
+  echo "待办 drop 必须原子结束内部拖动会话。" >&2
   exit 1
 fi
 
