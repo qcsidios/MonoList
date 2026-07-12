@@ -69,8 +69,8 @@ struct AppLaunchSmoke {
             "菜单栏辅助程序 Bundle ID 不正确"
         )
         try require(
-            helperPlist["LSUIElement"] as? Bool == true,
-            "菜单栏辅助程序不能显示 Dock 图标"
+            helperPlist["LSUIElement"] as? Bool != true,
+            "菜单栏辅助程序必须允许系统创建状态栏窗口"
         )
         try requireNormalIconSafeArea(iconPNGURL)
         try requireSimplifiedIcon(iconPNGURL)

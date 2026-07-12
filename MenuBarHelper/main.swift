@@ -30,7 +30,7 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
     private var countObserver: NSObjectProtocol?
     private var lastReportedFrame: NSRect?
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func start() {
         NSApp.setActivationPolicy(.accessory)
         parentProcessID = ProcessInfo.processInfo.arguments
             .dropFirst()
@@ -178,4 +178,8 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
 let application = NSApplication.shared
 let delegate = MenuBarHelperDelegate()
 application.delegate = delegate
-application.run()
+application.finishLaunching()
+delegate.start()
+withExtendedLifetime(delegate) {
+    application.run()
+}

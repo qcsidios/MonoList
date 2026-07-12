@@ -106,7 +106,7 @@ cat > "$HELPER_CONTENTS_DIR/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key>
     <string>$MIN_MACOS_VERSION</string>
     <key>LSUIElement</key>
-    <true/>
+    <false/>
 </dict>
 </plist>
 PLIST
