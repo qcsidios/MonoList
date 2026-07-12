@@ -12,6 +12,15 @@ struct TaskDropCoordinatorSmoke {
         let long = try store.add(text: "长期", group: .longTerm)
         let coordinator = TaskDropCoordinator()
 
+        coordinator.hover(
+            group: .shortTerm,
+            before: nil,
+            highlightsGroupHeader: true
+        )
+        precondition(coordinator.target?.highlightsGroupHeader == true)
+        coordinator.hover(group: .shortTerm, before: short.id)
+        precondition(coordinator.target?.highlightsGroupHeader == false)
+
         let nextID = UUID()
         precondition(
             coordinator.dropTarget(

@@ -127,6 +127,11 @@ if ! grep -q 'draftDropRow(group:' "$TASK_LIST"; then
   exit 1
 fi
 
+if ! grep -q 'dropCoordinator.target?.highlightsGroupHeader == true' "$TASK_LIST"; then
+  echo "分组标题聚焦必须与行间插入线使用互斥拖放状态。" >&2
+  exit 1
+fi
+
 if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDOW_COORDINATOR"; then
   echo "点击提醒浮层、菜单或下拉时不应被误判为主窗口外点击。" >&2
   exit 1

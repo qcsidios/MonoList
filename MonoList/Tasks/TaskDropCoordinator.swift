@@ -4,6 +4,17 @@ import Foundation
 struct TaskDropTarget: Equatable {
     let group: TaskGroup
     let beforeID: UUID?
+    let highlightsGroupHeader: Bool
+
+    init(
+        group: TaskGroup,
+        beforeID: UUID?,
+        highlightsGroupHeader: Bool = false
+    ) {
+        self.group = group
+        self.beforeID = beforeID
+        self.highlightsGroupHeader = highlightsGroupHeader
+    }
 }
 
 @MainActor
@@ -16,8 +27,16 @@ final class TaskDropCoordinator: ObservableObject {
         target = nil
     }
 
-    func hover(group: TaskGroup, before destinationID: UUID?) {
-        target = TaskDropTarget(group: group, beforeID: destinationID)
+    func hover(
+        group: TaskGroup,
+        before destinationID: UUID?,
+        highlightsGroupHeader: Bool = false
+    ) {
+        target = TaskDropTarget(
+            group: group,
+            beforeID: destinationID,
+            highlightsGroupHeader: highlightsGroupHeader
+        )
     }
 
     func dropTarget(
@@ -25,11 +44,13 @@ final class TaskDropCoordinator: ObservableObject {
         upperBeforeID: UUID?,
         lowerBeforeID: UUID?,
         locationY: CGFloat,
-        rowHeight: CGFloat
+        rowHeight: CGFloat,
+        highlightsGroupHeader: Bool = false
     ) -> TaskDropTarget {
         TaskDropTarget(
             group: group,
-            beforeID: locationY < rowHeight / 2 ? upperBeforeID : lowerBeforeID
+            beforeID: locationY < rowHeight / 2 ? upperBeforeID : lowerBeforeID,
+            highlightsGroupHeader: highlightsGroupHeader
         )
     }
 

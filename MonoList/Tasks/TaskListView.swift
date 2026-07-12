@@ -277,7 +277,8 @@ struct TaskListView: View {
         .frame(height: 29)
         .contentShape(Rectangle())
         .background(
-            dropCoordinator.target?.group == group
+            dropCoordinator.target?.group == group &&
+                dropCoordinator.target?.highlightsGroupHeader == true
                 ? Color.accentColor.opacity(0.08)
                 : Color.clear,
             in: RoundedRectangle(cornerRadius: 8)
@@ -287,6 +288,7 @@ struct TaskListView: View {
             upperBeforeID: nil,
             lowerBeforeID: nil,
             rowHeight: 29,
+            highlightsGroupHeader: true,
             store: store,
             coordinator: dropCoordinator,
             errorMessage: $errorMessage
@@ -368,6 +370,7 @@ struct TaskListView: View {
                         ? groupTasks[index + 1].id
                         : nil,
                     rowHeight: taskRowHeights[item.id] ?? 36,
+                    highlightsGroupHeader: false,
                     store: store,
                     coordinator: dropCoordinator,
                     errorMessage: $errorMessage
@@ -398,6 +401,7 @@ struct TaskListView: View {
                     upperBeforeID: beforeID,
                     lowerBeforeID: beforeID,
                     rowHeight: 36,
+                    highlightsGroupHeader: false,
                     store: store,
                     coordinator: dropCoordinator,
                     errorMessage: $errorMessage
@@ -777,6 +781,7 @@ private struct TaskGroupDropDelegate: DropDelegate {
     let upperBeforeID: UUID?
     let lowerBeforeID: UUID?
     let rowHeight: CGFloat
+    let highlightsGroupHeader: Bool
     let store: TaskStore
     let coordinator: TaskDropCoordinator
     @Binding var errorMessage: String?
@@ -825,11 +830,16 @@ private struct TaskGroupDropDelegate: DropDelegate {
             upperBeforeID: upperBeforeID,
             lowerBeforeID: lowerBeforeID,
             locationY: info.location.y,
-            rowHeight: rowHeight
+            rowHeight: rowHeight,
+            highlightsGroupHeader: highlightsGroupHeader
         )
         guard coordinator.target != target else { return }
         withAnimation(.easeOut(duration: 0.16)) {
-            coordinator.hover(group: target.group, before: target.beforeID)
+            coordinator.hover(
+                group: target.group,
+                before: target.beforeID,
+                highlightsGroupHeader: target.highlightsGroupHeader
+            )
         }
     }
 }
