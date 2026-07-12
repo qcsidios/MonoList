@@ -21,10 +21,15 @@ struct TaskDropTarget: Equatable {
 final class TaskDropCoordinator: ObservableObject {
     @Published private(set) var target: TaskDropTarget?
     @Published private(set) var sourceTask: TaskItem?
+    @Published private(set) var sessionID: UUID?
 
-    func beginDragging(task: TaskItem) {
+    @discardableResult
+    func beginDragging(task: TaskItem) -> UUID {
+        let sessionID = UUID()
+        self.sessionID = sessionID
         sourceTask = task
         target = nil
+        return sessionID
     }
 
     func hover(
@@ -54,13 +59,22 @@ final class TaskDropCoordinator: ObservableObject {
         )
     }
 
-    func cancel() {
+    func cancel(sessionID expectedSessionID: UUID? = nil) {
+        if let expectedSessionID, expectedSessionID != sessionID {
+            return
+        }
         target = nil
         sourceTask = nil
+        sessionID = nil
     }
 
     func clearTarget() {
         target = nil
+    }
+
+    func takeTarget() -> TaskDropTarget? {
+        defer { target = nil }
+        return target
     }
 
     func performDrop(sourceID: UUID, store: TaskStore) throws {

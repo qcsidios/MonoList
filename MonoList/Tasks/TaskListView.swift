@@ -666,8 +666,9 @@ private struct TaskDragInsertionIndicator: View {
         Capsule()
             .fill(Color.accentColor.opacity(0.72))
             .frame(height: 2)
-            .padding(.horizontal, 8)
-            .transition(.opacity)
+        .padding(.horizontal, 8)
+        .transition(.opacity)
+        .allowsHitTesting(false)
     }
 }
 
@@ -802,19 +803,35 @@ private struct TaskGroupDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
+        guard let sessionID = coordinator.sessionID else {
+            coordinator.clearTarget()
+            return false
+        }
+        updateTarget(info)
+        guard let target = coordinator.takeTarget() else {
+            coordinator.cancel(sessionID: sessionID)
+            return false
+        }
         guard let provider = info.itemProviders(for: [UTType.text]).first else {
+            coordinator.cancel(sessionID: sessionID)
             return false
         }
         provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard let value = object as? NSString,
-                  let sourceID = UUID(uuidString: value as String) else { return }
             Task { @MainActor in
+                defer { coordinator.cancel(sessionID: sessionID) }
+                guard let value = object as? NSString,
+                      let sourceID = UUID(uuidString: value as String) else {
+                    return
+                }
                 do {
                     try withAnimation(
                         .easeOut(duration: 0.16)
                     ) {
-                        updateTarget(info)
-                        try coordinator.performDrop(sourceID: sourceID, store: store)
+                        try store.move(
+                            id: sourceID,
+                            to: target.group,
+                            before: target.beforeID
+                        )
                     }
                 } catch {
                     errorMessage = error.localizedDescription

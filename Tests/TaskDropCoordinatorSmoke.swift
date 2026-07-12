@@ -20,6 +20,17 @@ struct TaskDropCoordinatorSmoke {
         precondition(coordinator.target?.highlightsGroupHeader == true)
         coordinator.hover(group: .shortTerm, before: short.id)
         precondition(coordinator.target?.highlightsGroupHeader == false)
+        let consumedTarget = coordinator.takeTarget()
+        precondition(consumedTarget?.beforeID == short.id)
+        precondition(coordinator.target == nil)
+
+        let firstSession = coordinator.beginDragging(task: short)
+        let secondSession = coordinator.beginDragging(task: long)
+        coordinator.cancel(sessionID: firstSession)
+        precondition(coordinator.sessionID == secondSession)
+        precondition(coordinator.sourceTask?.id == long.id)
+        coordinator.cancel(sessionID: secondSession)
+        precondition(coordinator.sessionID == nil)
 
         let nextID = UUID()
         precondition(

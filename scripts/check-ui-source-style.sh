@@ -132,6 +132,18 @@ if ! grep -q 'dropCoordinator.target?.highlightsGroupHeader == true' "$TASK_LIST
   exit 1
 fi
 
+if ! grep -q 'coordinator.takeTarget()' "$TASK_LIST" ||
+   ! grep -A8 'private struct TaskDragInsertionIndicator' "$TASK_LIST" |
+     grep -q 'allowsHitTesting(false)'; then
+  echo "松开鼠标时必须立即清除插入线，且插入线不能拦截 drop 命中。" >&2
+  exit 1
+fi
+
+if ! grep -q 'guard let sessionID = coordinator.sessionID' "$TASK_LIST"; then
+  echo "待办列表必须拒绝没有内部拖动会话的外部文本 drop。" >&2
+  exit 1
+fi
+
 if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDOW_COORDINATOR"; then
   echo "点击提醒浮层、菜单或下拉时不应被误判为主窗口外点击。" >&2
   exit 1
