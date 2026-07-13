@@ -36,7 +36,6 @@ fi
 
 bash scripts/check-task-store.sh
 bash scripts/check-task-drop-coordinator.sh
-bash scripts/check-app-launch.sh
 bash scripts/check-app-settings.sh
 bash scripts/check-ui-source-style.sh
 bash scripts/check-reminder-scheduler.sh
@@ -46,6 +45,7 @@ bash scripts/check-project-integrity.sh
 bash scripts/check-app-updater.sh
 bash scripts/check-update-installer.sh
 MONOLIST_APP_VERSION="$VERSION" bash scripts/package-dmg.sh >/dev/null
+bash scripts/check-app-launch.sh
 bash scripts/check-release-signature.sh
 bash scripts/check-dmg-layout.sh "$DMG_PATH"
 

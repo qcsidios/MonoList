@@ -15,16 +15,55 @@ for path in MonoList MenuBarHelper Tests scripts docs release-notes; do
   }
 done
 
-for script in \
-  build-local.sh \
-  package-dmg.sh \
-  release.sh \
-  cleanup-build.sh; do
-  [[ -f "$ROOT_DIR/scripts/$script" ]] || {
-    echo "缺少构建脚本：$script" >&2
+required_files=(
+  "$ROOT_DIR/Tests/AppLaunchSmoke.swift"
+  "$ROOT_DIR/Tests/AppSettingsSmoke.swift"
+  "$ROOT_DIR/Tests/AppUpdaterSmoke.swift"
+  "$ROOT_DIR/Tests/MenuBarBridgeSmoke.swift"
+  "$ROOT_DIR/Tests/ReminderSchedulerSmoke.swift"
+  "$ROOT_DIR/Tests/TaskDropCoordinatorSmoke.swift"
+  "$ROOT_DIR/Tests/TaskStoreSmoke.swift"
+  "$ROOT_DIR/Tests/UpdateInstallerSmoke.swift"
+  "$ROOT_DIR/Tests/WindowCoordinatorSmoke.swift"
+  "$ROOT_DIR/scripts/build-local.sh"
+  "$ROOT_DIR/scripts/package-dmg.sh"
+  "$ROOT_DIR/scripts/release.sh"
+  "$ROOT_DIR/scripts/cleanup-build.sh"
+)
+
+for file in "${required_files[@]}"; do
+  [[ -f "$file" ]] || {
+    echo "缺少项目文件：$file" >&2
     exit 1
   }
 done
+
+while IFS= read -r script_path; do
+  [[ -f "$ROOT_DIR/$script_path" ]] || {
+    echo "README 或发布流程引用了不存在的脚本：$script_path" >&2
+    exit 1
+  }
+done < <(
+  rg -o --no-filename 'scripts/[A-Za-z0-9._-]+\.sh' \
+    "$ROOT_DIR/README.md" \
+    "$ROOT_DIR/scripts/release.sh" |
+    sort -u
+)
+
+package_line="$(
+  rg -n 'bash scripts/package-dmg\.sh' "$ROOT_DIR/scripts/release.sh" |
+    head -n 1 |
+    cut -d: -f1
+)"
+launch_line="$(
+  rg -n 'bash scripts/check-app-launch\.sh' "$ROOT_DIR/scripts/release.sh" |
+    head -n 1 |
+    cut -d: -f1
+)"
+if [[ -z "$package_line" || -z "$launch_line" || "$package_line" -ge "$launch_line" ]]; then
+  echo "发布流程必须先构建最终 App，再执行 App 启动检查。" >&2
+  exit 1
+fi
 
 if ! rg -q -- "-name '\\*.app'" "$ROOT_DIR/scripts/cleanup-build.sh"; then
   echo "清理脚本必须删除 build 中的测试 App，避免污染 Spotlight。" >&2

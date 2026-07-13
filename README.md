@@ -26,8 +26,28 @@ build/
 └── release/MonoList-vX.Y.Z.dmg
 ```
 
-发布后执行 `scripts/cleanup-build.sh`，自动删除测试产物和 DMG
-暂存目录，只保留最新本地 App 与安装包。
+发布后执行 `scripts/cleanup-build.sh`，自动删除测试 App、测试产物和 DMG
+暂存目录，只保留 `build/release` 中的安装包。
+
+## 验证
+
+```bash
+bash scripts/check-task-store.sh
+bash scripts/check-task-drop-coordinator.sh
+bash scripts/check-app-settings.sh
+bash scripts/check-ui-source-style.sh
+bash scripts/check-reminder-scheduler.sh
+bash scripts/check-menu-bar-bridge.sh
+bash scripts/check-window-coordinator.sh
+bash scripts/check-project-integrity.sh
+bash scripts/check-app-updater.sh
+bash scripts/check-update-installer.sh
+bash scripts/build-local.sh
+bash scripts/check-app-launch.sh
+```
+
+`release.sh` 会在创建 tag 和 GitHub Release 前重复运行这些检查，并验证最终
+App 的签名和 DMG 布局。
 
 ## 功能
 
@@ -62,5 +82,5 @@ Developer ID、不进行 Apple 公证，也不上架 App Store。首次运行时
 构建发布包：
 
 ```bash
-MONOLIST_APP_VERSION=v0.4.2 bash scripts/package-dmg.sh
+MONOLIST_APP_VERSION=vX.Y.Z bash scripts/package-dmg.sh
 ```
