@@ -3,71 +3,38 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build/tests"
-TEST_EXECUTABLE="$BUILD_DIR/MenuBarBridgeSmoke"
+BRIDGE_TEST="$BUILD_DIR/MenuBarBridgeSmoke"
+HELPER_TEST="$BUILD_DIR/MenuBarServiceLifecycleSmoke"
 
 mkdir -p "$BUILD_DIR"
 
-if ! grep -q 'NSStatusBar.system.statusItem' \
+if rg -q 'NSStatusBar\.system\.statusItem' \
   "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 主进程必须直接创建菜单栏状态项。" >&2
+  echo "主进程不能继续创建已被 macOS 隐藏的状态项。" >&2
   exit 1
 fi
 
-if ! grep -q '^@main$' "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 菜单栏入口必须由 AppKit 应用生命周期托管。" >&2
-  exit 1
-fi
-
-if rg -q 'NSApplicationDelegateAdaptor' "$ROOT_DIR/MonoList/App"; then
-  echo "MonoList 不能再由 SwiftUI App 生命周期托管菜单栏入口。" >&2
-  exit 1
-fi
-
-if grep -q 'launchMenuBarHelper' "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 不能再依赖菜单栏辅助进程。" >&2
-  exit 1
-fi
-
-if ! grep -q 'button?.image = MenuBarIconRenderer.makeImage()' \
-  "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "菜单栏必须显示 MonoList Logo 图标。" >&2
-  exit 1
-fi
-
-if grep -q 'autosaveName' "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 状态项不能继承系统保存的隐藏位置。" >&2
-  exit 1
-fi
-
-if ! grep -q 'statusItem(withLength: NSStatusItem.variableLength)' \
-  "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 状态项必须同时容纳 Logo 和待办数量。" >&2
-  exit 1
-fi
-
-if ! awk '
-  /NSStatusBar\.system\.statusItem/ { status = NR }
-  /let applicationSupportURL/ { support = NR }
-  END { exit !(status > 0 && support > 0 && status < support) }
-' "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 必须在加载数据和窗口前注册状态项。" >&2
-  exit 1
-fi
-
-if ! grep -q 'application.setActivationPolicy(.accessory)' \
+if ! rg -q 'launchMenuBarHelper' \
   "$ROOT_DIR/MonoList/App/AppDelegate.swift" ||
-  grep -q 'NSApp.setActivationPolicy(.regular)' \
+  ! rg -q 'openApplication' \
   "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 必须保持 accessory 激活策略。" >&2
+  echo "MonoList 必须通过 LaunchServices 启动独立菜单栏服务。" >&2
   exit 1
 fi
 
-if ! awk '
-  /application\.setActivationPolicy\(\.accessory\)/ { policy = NR }
-  /application\.run\(\)/ { run = NR }
-  END { exit !(policy > 0 && run > 0 && policy < run) }
-' "$ROOT_DIR/MonoList/App/AppDelegate.swift"; then
-  echo "MonoList 必须在启动事件循环前设置 accessory 激活策略。" >&2
+if ! rg -q 'NSStatusBar\.system\.statusItem' \
+  "$ROOT_DIR/MenuBarHelper/main.swift" ||
+  ! rg -q 'MenuBarIconRenderer\.makeImage' \
+  "$ROOT_DIR/MenuBarHelper/main.swift" ||
+  ! rg -q 'MenuBarBridgeProtocol\.title' \
+  "$ROOT_DIR/MenuBarHelper/main.swift"; then
+  echo "菜单栏服务必须同时创建 Logo 和待办数量。" >&2
+  exit 1
+fi
+
+if ! rg -q 'statusItemAutosaveName' \
+  "$ROOT_DIR/MenuBarHelper/main.swift"; then
+  echo "菜单栏服务必须使用新的稳定状态项名称。" >&2
   exit 1
 fi
 
@@ -75,6 +42,30 @@ swiftc \
   -parse-as-library \
   "$ROOT_DIR/MonoList/App/MenuBarBridgeProtocol.swift" \
   "$ROOT_DIR/Tests/MenuBarBridgeSmoke.swift" \
-  -o "$TEST_EXECUTABLE"
+  -o "$BRIDGE_TEST"
 
-"$TEST_EXECUTABLE"
+"$BRIDGE_TEST"
+
+swiftc \
+  "$ROOT_DIR/MonoList/App/MenuBarBridgeProtocol.swift" \
+  "$ROOT_DIR/MonoList/App/MenuBarIconRenderer.swift" \
+  "$ROOT_DIR/MenuBarHelper/main.swift" \
+  -o "$HELPER_TEST"
+
+"$HELPER_TEST" 999999 0 &
+helper_pid=$!
+for _ in {1..30}; do
+  if ! kill -0 "$helper_pid" 2>/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+if kill -0 "$helper_pid" 2>/dev/null; then
+  kill "$helper_pid" 2>/dev/null || true
+  wait "$helper_pid" 2>/dev/null || true
+  echo "菜单栏服务必须在主进程退出后自动结束。" >&2
+  exit 1
+fi
+wait "$helper_pid" 2>/dev/null || true
+
+echo "Menu bar bridge smoke passed."

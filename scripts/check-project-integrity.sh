@@ -8,17 +8,12 @@ if git -C "$ROOT_DIR" ls-files | grep -qE '(^|/)\.DS_Store$'; then
   exit 1
 fi
 
-for path in MonoList Tests scripts docs release-notes; do
+for path in MonoList MenuBarHelper Tests scripts docs release-notes; do
   [[ -d "$ROOT_DIR/$path" ]] || {
     echo "缺少项目目录：$path" >&2
     exit 1
   }
 done
-
-[[ ! -e "$ROOT_DIR/MenuBarHelper" ]] || {
-  echo "单进程菜单栏架构不能保留废弃的 MenuBarHelper 源码。" >&2
-  exit 1
-}
 
 for script in \
   build-local.sh \
@@ -30,5 +25,10 @@ for script in \
     exit 1
   }
 done
+
+if ! rg -q -- "-name '\\*.app'" "$ROOT_DIR/scripts/cleanup-build.sh"; then
+  echo "清理脚本必须删除 build 中的测试 App，避免污染 Spotlight。" >&2
+  exit 1
+fi
 
 echo "Project integrity check passed."

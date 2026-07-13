@@ -1,21 +1,22 @@
 import Foundation
 
 enum MenuBarBridgeProtocol {
-    static let helperBundleIdentifier = "com.qingcheng.monolist.menubar"
+    static let helperBundleIdentifier = "com.qingcheng.monolist.menubar.v2"
+    static let statusItemAutosaveName = "MonoList.MenuBarService.v2"
     static let showMainPanel = Notification.Name(
-        "com.qingcheng.monolist.showMainPanel"
+        "com.qingcheng.monolist.menubar.v2.showMainPanel"
     )
     static let openSettings = Notification.Name(
-        "com.qingcheng.monolist.openSettings"
+        "com.qingcheng.monolist.menubar.v2.openSettings"
     )
     static let pendingCountChanged = Notification.Name(
-        "com.qingcheng.monolist.pendingCountChanged"
+        "com.qingcheng.monolist.menubar.v2.pendingCountChanged"
     )
     static let statusItemFrameChanged = Notification.Name(
-        "com.qingcheng.monolist.statusItemFrameChanged"
+        "com.qingcheng.monolist.menubar.v2.statusItemFrameChanged"
     )
     static let quit = Notification.Name(
-        "com.qingcheng.monolist.quit"
+        "com.qingcheng.monolist.menubar.v2.quit"
     )
 
     static func title(pendingCount: Int) -> String {
