@@ -27,7 +27,9 @@ build/
 ```
 
 发布后执行 `scripts/cleanup-build.sh`，自动删除测试 App、测试产物和 DMG
-暂存目录，只保留 `build/release` 中的安装包。
+暂存目录，只保留 `build/release` 中的正式安装包。`build/release` 默认至少保留
+最新版 DMG；清理时不得删除整个 `build/`。只有已经核对 GitHub Release 存在
+同版本资产且明确决定不再保留本地副本时，才可删除正式安装包。
 
 ## 验证
 
