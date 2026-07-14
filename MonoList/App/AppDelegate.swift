@@ -84,12 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             },
             onTestReminder: { [weak self] in
-                guard let self else { return }
-                if self.reminderPanelController?.isTesting == true {
-                    self.reminderPanelController?.close()
-                } else {
-                    self.showReminder(testing: true)
-                }
+                self?.showReminder(testing: true)
             }
         )
 

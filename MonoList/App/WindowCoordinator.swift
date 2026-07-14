@@ -23,6 +23,14 @@ final class WindowCoordinator {
         frame?.insetBy(dx: -2, dy: -2).contains(point) == true
     }
 
+    static func shouldCloseMainPanel(
+        clickedWindow: NSWindow?,
+        mainPanel: NSWindow,
+        settingsWindow: NSWindow?
+    ) -> Bool {
+        clickedWindow !== mainPanel && clickedWindow === settingsWindow
+    }
+
     static func fallbackMainPanelAnchor(
         in screenFrame: NSRect,
         menuBarBottomY: CGFloat
@@ -518,7 +526,15 @@ final class WindowCoordinator {
         }
         localOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
-        ) { event in
+        ) { [weak self, weak panel] event in
+            guard let self, let panel else { return event }
+            if Self.shouldCloseMainPanel(
+                clickedWindow: event.window,
+                mainPanel: panel,
+                settingsWindow: self.settingsWindow
+            ) {
+                self.closeMainPanel()
+            }
             return event
         }
     }

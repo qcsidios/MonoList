@@ -82,6 +82,7 @@ struct TaskRowView: View {
                     } else {
                         Text(text)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
                             .contentShape(Rectangle())
                             .highPriorityGesture(
                                 TapGesture(count: 2).onEnded {

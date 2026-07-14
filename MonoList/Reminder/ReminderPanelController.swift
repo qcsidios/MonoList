@@ -30,6 +30,7 @@ final class ReminderPanelController: ObservableObject {
     init(
         playSound: @escaping (String) -> Void = { name in
             if let sound = NSSound(named: NSSound.Name(name)) {
+                sound.stop()
                 sound.play()
             } else {
                 NSSound.beep()

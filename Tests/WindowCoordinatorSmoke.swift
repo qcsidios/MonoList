@@ -105,6 +105,22 @@ struct WindowCoordinatorSmoke {
                 dateHeaderCount: 0
             ) > WindowCoordinator.mainPanelMaximumHeight
         )
+        let panelWindow = NSPanel()
+        let settingsWindow = NSWindow()
+        precondition(
+            !WindowCoordinator.shouldCloseMainPanel(
+                clickedWindow: panelWindow,
+                mainPanel: panelWindow,
+                settingsWindow: settingsWindow
+            )
+        )
+        precondition(
+            WindowCoordinator.shouldCloseMainPanel(
+                clickedWindow: settingsWindow,
+                mainPanel: panelWindow,
+                settingsWindow: settingsWindow
+            )
+        )
         var directSubmitCount = 0
         let directEditor = TaskSubmitTextView()
         directEditor.onSubmit = { directSubmitCount += 1 }
@@ -140,6 +156,14 @@ struct WindowCoordinatorSmoke {
         )
         precondition(taskListSource.contains("withAnimation("))
         precondition(taskListSource.contains(".easeOut(duration: 0.16)"))
+        let taskRowSource = try String(
+            contentsOfFile: "MonoList/Tasks/TaskRowView.swift",
+            encoding: .utf8
+        )
+        precondition(
+            taskRowSource.contains(".fixedSize(horizontal: false, vertical: true)"),
+            "带提醒的多行任务正文不能被面板高度压缩"
+        )
         let headerIconStart = taskListSource.range(
             of: "private struct HeaderIconLabel"
         )

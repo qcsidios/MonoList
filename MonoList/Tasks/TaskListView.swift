@@ -45,13 +45,20 @@ struct TaskListView: View {
     }
 
     private var naturalHeight: CGFloat {
-        let visibleTasks = store.pendingTasks + todayCompleted + visibleOlderCompleted
-        var extraLines = visibleTasks.reduce(0) {
+        var extraLines = (todayCompleted + visibleOlderCompleted).reduce(0) {
             $0 + Self.additionalLines(for: $1.text)
         }
-        extraLines += store.pendingTasks.filter { $0.reminder != nil }.count
         if draftState.isPresented {
             extraLines += Self.additionalLines(for: draftState.text)
+        }
+        let pendingAdditionalHeight = store.pendingTasks.reduce(CGFloat.zero) {
+            height, item in
+            if let measuredHeight = taskRowHeights[item.id] {
+                return height + max(0, measuredHeight - 36)
+            }
+            let addedRows = Self.additionalLines(for: item.text) +
+                (item.reminder == nil ? 0 : 1)
+            return height + CGFloat(addedRows * 17)
         }
         let rows = store.pendingTasks.count +
             todayCompleted.count +
@@ -62,7 +69,7 @@ struct TaskListView: View {
             rowCount: rows,
             additionalLineCount: extraLines,
             dateHeaderCount: dateHeaders
-        ) + 58
+        ) + pendingAdditionalHeight + 58
     }
 
     private var preferredHeight: CGFloat {

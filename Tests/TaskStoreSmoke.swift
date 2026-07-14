@@ -199,21 +199,33 @@ struct TaskStoreSmoke {
             from: DateComponents(year: 2026, month: 7, day: 6, hour: 12)
         )!
         let todayTask = try store.add(text: "今天创建完成", createdAt: today)
-        let olderTask = try store.add(
+        let createdYesterday = try store.add(
             text: "昨天创建今天完成",
             createdAt: today.addingTimeInterval(-24 * 60 * 60)
         )
 
         try store.complete(id: todayTask.id, at: today.addingTimeInterval(60))
-        try store.complete(id: olderTask.id, at: today.addingTimeInterval(120))
+        try store.complete(id: createdYesterday.id, at: today.addingTimeInterval(120))
 
         try require(
-            store.completedTasks(on: today, calendar: calendar).map(\.id) == [todayTask.id],
-            "今天完成任务筛选不正确"
+            store.completedTasks(on: today, calendar: calendar).map(\.id) ==
+                [createdYesterday.id, todayTask.id],
+            "今天完成的任务没有全部默认显示"
         )
         try require(
-            store.completedTasks(before: today, calendar: calendar).map(\.id) == [olderTask.id],
-            "较早完成任务筛选不正确"
+            store.completedTasks(before: today, calendar: calendar).isEmpty,
+            "今天完成的任务被错误归入较早记录"
+        )
+
+        let tomorrow = today.addingTimeInterval(24 * 60 * 60)
+        try require(
+            store.completedTasks(on: tomorrow, calendar: calendar).isEmpty,
+            "跨日后今天的完成项仍被当作明日完成项"
+        )
+        try require(
+            store.completedTasks(before: tomorrow, calendar: calendar).map(\.id) ==
+                [createdYesterday.id, todayTask.id],
+            "完成项跨日后没有自动归入较早记录"
         )
     }
 

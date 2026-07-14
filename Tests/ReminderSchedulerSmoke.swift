@@ -173,9 +173,22 @@ struct ReminderSchedulerSmoke {
         precondition(controller.isTesting)
         precondition((controller.currentPanelHeight ?? 0) < 110)
         precondition(playedSounds == ["Ping"])
+        controller.show(
+            tasks: testTasks,
+            position: .topCenter,
+            menuBarButton: nil,
+            testing: true,
+            soundName: "Ping",
+            onOpen: {},
+            onClose: {}
+        )
+        precondition(
+            playedSounds == ["Ping", "Ping"],
+            "重复点击测试提醒应每次重新播放声音"
+        )
         controller.close(animated: false)
         precondition(!controller.isTesting)
-        precondition(playedSounds == ["Ping"])
+        precondition(playedSounds == ["Ping", "Ping"])
         controller.show(
             tasks: testTasks,
             position: .topCenter,
@@ -185,8 +198,23 @@ struct ReminderSchedulerSmoke {
             onOpen: {},
             onClose: {}
         )
-        precondition(playedSounds == ["Ping"])
+        precondition(playedSounds == ["Ping", "Ping"])
         controller.close(animated: false)
+
+        let appDelegateSource = try! String(
+            contentsOfFile: "MonoList/App/AppDelegate.swift",
+            encoding: .utf8
+        )
+        let testReminderStart = appDelegateSource.range(of: "onTestReminder: { [weak self] in")!
+        let testReminderEnd = appDelegateSource.range(
+            of: "\n            }\n        )",
+            range: testReminderStart.lowerBound..<appDelegateSource.endIndex
+        )!
+        let testReminderHandler = appDelegateSource[
+            testReminderStart.lowerBound..<testReminderEnd.upperBound
+        ]
+        precondition(!testReminderHandler.contains("isTesting"))
+        precondition(testReminderHandler.contains("showReminder(testing: true)"))
 
         print("Reminder scheduler smoke passed.")
     }
