@@ -126,6 +126,20 @@ struct WindowCoordinatorSmoke {
         directEditor.onSubmit = { directSubmitCount += 1 }
         directEditor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
         precondition(directSubmitCount == 1)
+        directEditor.string = "可以复制的待办"
+        let selectAllEvent = commandKeyEvent(character: "a", keyCode: 0)
+        precondition(directEditor.performKeyEquivalent(with: selectAllEvent))
+        precondition(directEditor.selectedRange() == NSRange(location: 0, length: 7))
+        NSPasteboard.general.clearContents()
+        let copyEvent = commandKeyEvent(character: "c", keyCode: 8)
+        precondition(directEditor.performKeyEquivalent(with: copyEvent))
+        precondition(NSPasteboard.general.string(forType: .string) == "可以复制的待办")
+        let cutEvent = commandKeyEvent(character: "x", keyCode: 7)
+        precondition(directEditor.performKeyEquivalent(with: cutEvent))
+        precondition(directEditor.string.isEmpty)
+        let pasteEvent = commandKeyEvent(character: "v", keyCode: 9)
+        precondition(directEditor.performKeyEquivalent(with: pasteEvent))
+        precondition(directEditor.string == "可以复制的待办")
         let emptyDraftHeight = try measuredTaskEditorHeight(
             text: "",
             width: 310,
@@ -296,6 +310,21 @@ struct WindowCoordinatorSmoke {
             }
         }
         return nil
+    }
+
+    private static func commandKeyEvent(character: String, keyCode: UInt16) -> NSEvent {
+        NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: .command,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: character,
+            charactersIgnoringModifiers: character,
+            isARepeat: false,
+            keyCode: keyCode
+        )!
     }
 }
 

@@ -83,6 +83,33 @@ final class TaskSubmitTextView: NSTextView {
         return resigned
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([
+            .command,
+            .option,
+            .control,
+            .shift,
+        ])
+        guard modifiers == .command,
+              let character = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch character {
+        case "a":
+            selectAll(nil)
+        case "c":
+            copy(nil)
+        case "x":
+            cut(nil)
+        case "v":
+            paste(nil)
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
     override func doCommand(by selector: Selector) {
         let submits = selector == #selector(NSResponder.insertNewline(_:)) ||
             selector == #selector(NSResponder.insertLineBreak(_:)) ||
