@@ -16,7 +16,7 @@
 ## 更新检测
 
 - 网络测试记录全部请求 host，确认不存在 `api.github.com`。
-- `github.com/qcsidios/MonoList/releases/latest` 跳转到版本页后解析版本号。
+- `github.com/readercyl/MonoList/releases/latest` 跳转到版本页后解析版本号。
 - 对 `MonoList-vX.Y.Z.dmg` 执行 HEAD 验证，存在安装包才显示升级。
 
 ## 完整验证

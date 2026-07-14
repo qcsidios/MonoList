@@ -24,13 +24,13 @@ struct AppUpdaterSmoke {
         }
         precondition(networkUpdate.version == "v0.4.8")
         precondition(ReleaseURLProtocol.requestedHosts == ["api.github.com"])
-        precondition(ReleaseURLProtocol.requestedPaths == ["/repos/qcsidios/MonoList/releases/latest"])
+        precondition(ReleaseURLProtocol.requestedPaths == ["/repos/readercyl/MonoList/releases/latest"])
         precondition(
             networkUpdate.dmgURL.absoluteString ==
-                "https://github.com/qcsidios/MonoList/releases/download/v0.4.8/MonoList-v0.4.8.dmg"
+                "https://github.com/readercyl/MonoList/releases/download/v0.4.8/MonoList-v0.4.8.dmg"
         )
         let fallbackResult = AppUpdater.parseLatestReleaseURL(
-            URL(string: "https://github.com/qcsidios/MonoList/releases/tag/v0.4.6")!,
+            URL(string: "https://github.com/readercyl/MonoList/releases/tag/v0.4.6")!,
             currentVersion: "0.4.5"
         )
         guard case let .available(fallbackUpdate) = fallbackResult else {
@@ -39,7 +39,7 @@ struct AppUpdaterSmoke {
         precondition(fallbackUpdate.version == "v0.4.6")
         precondition(
             fallbackUpdate.dmgURL.absoluteString ==
-                "https://github.com/qcsidios/MonoList/releases/download/v0.4.6/MonoList-v0.4.6.dmg"
+                "https://github.com/readercyl/MonoList/releases/download/v0.4.6/MonoList-v0.4.6.dmg"
         )
 
         precondition(AppUpdater.shouldAutomaticallyCheck(lastCheckedAt: nil))
@@ -80,7 +80,7 @@ private final class ReleaseURLProtocol: URLProtocol {
 
         let response: HTTPURLResponse
         if url.host == "api.github.com",
-           url.path == "/repos/qcsidios/MonoList/releases/latest" {
+           url.path == "/repos/readercyl/MonoList/releases/latest" {
             response = HTTPURLResponse(
                 url: url,
                 statusCode: 200,
@@ -101,7 +101,7 @@ private final class ReleaseURLProtocol: URLProtocol {
                       "assets": [
                         {
                           "name": "MonoList-v0.4.8.dmg",
-                          "browser_download_url": "https://github.com/qcsidios/MonoList/releases/download/v0.4.8/MonoList-v0.4.8.dmg"
+                          "browser_download_url": "https://github.com/readercyl/MonoList/releases/download/v0.4.8/MonoList-v0.4.8.dmg"
                         }
                       ]
                     }

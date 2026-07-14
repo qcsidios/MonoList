@@ -14,7 +14,7 @@ enum AppUpdateCheckResult: Equatable {
 
 @MainActor
 final class AppUpdater: ObservableObject {
-    static let repository = "qcsidios/MonoList"
+    static let repository = "readercyl/MonoList"
     static let latestReleasePageURL = URL(
         string: "https://github.com/\(repository)/releases/latest"
     )!

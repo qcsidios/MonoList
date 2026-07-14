@@ -5,7 +5,7 @@
 ## 根因
 
 - Enter 监听闭包在 `TaskListView` 首次出现时捕获了焦点状态副本；之后虽然输入框获得焦点，闭包仍可能按旧状态放行 Enter。
-- 实测 `api.github.com` 出现 SSL/EOF 连接失败，而 `github.com/qcsidios/MonoList/releases/latest` 和 `v0.4.6` DMG 下载地址均正常。
+- 实测 `api.github.com` 出现 SSL/EOF 连接失败，而 `github.com/readercyl/MonoList/releases/latest` 和 `v0.4.6` DMG 下载地址均正常。
 
 ## 修复与验证
 
