@@ -9,6 +9,11 @@
           "path": "versions/v1/index.html",
           "createdAt": "2026-07-15T09:51:31.749Z",
           "status": "needs-review"
+        },
+        {
+          "path": "versions/v2/index.html",
+          "createdAt": "2026-07-15T12:38:43.194Z",
+          "status": "needs-review"
         }
       ]
     },
@@ -17,6 +22,11 @@
         {
           "path": "versions/v1/mobile-preview.html",
           "createdAt": "2026-07-15T09:51:31.776Z",
+          "status": "needs-review"
+        },
+        {
+          "path": "versions/v2/mobile-preview.html",
+          "createdAt": "2026-07-15T12:38:43.222Z",
           "status": "needs-review"
         }
       ]
@@ -27,10 +37,15 @@
           "path": "versions/v1/monolist-xhs-v1-complete.html",
           "createdAt": "2026-07-15T09:51:31.797Z",
           "status": "needs-review"
+        },
+        {
+          "path": "versions/v2/monolist-xhs-v2-complete.html",
+          "createdAt": "2026-07-15T12:38:43.241Z",
+          "status": "needs-review"
         }
       ]
     }
   },
   "createdAt": "2026-07-15T09:51:31.754Z",
-  "updatedAt": "2026-07-15T09:51:31.797Z"
+  "updatedAt": "2026-07-15T12:38:43.242Z"
 }

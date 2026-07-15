@@ -1,14 +1,21 @@
 {
   "schemaVersion": 1,
-  "currentVersion": "v1",
+  "currentVersion": "v2",
   "sequenceFileNamePattern": "{sequence}.png",
   "versions": [
     {
       "id": "v1",
-      "status": "current",
+      "status": "archived",
       "fileNameMode": "sequence",
       "createdAt": "2026-07-15T00:00:00+08:00",
       "summary": "MonoList 首版小红书商品主图、轮播图与长详情页"
+    },
+    {
+      "id": "v2",
+      "status": "current",
+      "fileNameMode": "sequence",
+      "createdAt": "2026-07-15T00:00:00+08:00",
+      "summary": "1:1 与 3:4 首图独立构图，并按 430 pt 代码尺寸校正控制台"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # MonoList 小红书商品详情页
 
-当前版本：`v1`
+当前版本：`v2`
 
 建议商品标题：`Mac菜单栏待办工具 MonoList｜随手记·轻提醒·本地保存`
 
@@ -12,8 +12,13 @@
 - `01-3x4.png`：轮播第一张，与商品主图共享同一视觉概念。
 - `02.png`–`09.png`：其余 3:4 轮播图。
 - `10.png`：长详情页。
-- `versions/v1/monolist-xhs-v1-complete.html`：无外部依赖、可单独发送的完整 HTML。
-- `versions/v1/mobile-preview.html`：手机端与小尺寸主图预览。
+- `versions/v2/monolist-xhs-v2-complete.html`：无外部依赖、可单独发送的完整 HTML。
+- `versions/v2/mobile-preview.html`：手机端与小尺寸主图预览。
+
+## 版本记录
+
+- `v1`：首版完整商品详情页。
+- `v2`：1:1 与 3:4 首图改为独立构图；控制台按代码中的 430 pt 固定宽度重新绘制。
 
 ## 产品事实来源
 
