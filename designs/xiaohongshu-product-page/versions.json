@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "currentVersion": "v1",
+  "sequenceFileNamePattern": "{sequence}.png",
+  "versions": [
+    {
+      "id": "v1",
+      "status": "current",
+      "fileNameMode": "sequence",
+      "createdAt": "2026-07-15T00:00:00+08:00",
+      "summary": "MonoList 首版小红书商品主图、轮播图与长详情页"
+    }
+  ]
+}
