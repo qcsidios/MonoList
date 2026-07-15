@@ -15,7 +15,7 @@ if (!versionConfig) {
 }
 
 const baseURL = process.env.MONOLIST_DESIGN_URL
-  || `http://127.0.0.1:4312/xiaohongshu-product-page/versions/${version}/index.html`;
+  || `http://127.0.0.1:4312/xiaohongshu-product-page/versions/${version}/${versionConfig.files.master}`;
 const outputDir = path.join(designRoot, "versions", version, "exports");
 await mkdir(outputDir, { recursive: true });
 

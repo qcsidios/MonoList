@@ -5,13 +5,14 @@ import { fileURLToPath } from "node:url";
 const designRoot = path.dirname(fileURLToPath(import.meta.url));
 const manifest = JSON.parse(await readFile(path.join(designRoot, "versions.json"), "utf8"));
 const version = process.argv[2] || manifest.currentVersion;
-if (!manifest.versions.some((item) => item.id === version)) {
+const versionConfig = manifest.versions.find((item) => item.id === version);
+if (!versionConfig) {
   throw new Error(`未知版本 ${version}`);
 }
 
 const versionDir = path.join(designRoot, "versions", version);
 const [html, css, icon] = await Promise.all([
-  readFile(path.join(versionDir, "index.html"), "utf8"),
+  readFile(path.join(versionDir, versionConfig.files.master), "utf8"),
   readFile(path.join(versionDir, "styles.css"), "utf8"),
   readFile(path.join(designRoot, "assets", "monolist-icon.png")),
 ]);
@@ -23,6 +24,6 @@ const completeHTML = html
 const unresolved = completeHTML.match(/(?:src|href)="(?!data:|https?:|#)([^"]+)"/);
 if (unresolved) throw new Error(`完整 HTML 仍引用本地文件：${unresolved[1]}`);
 
-const outputPath = path.join(versionDir, "full.html");
+const outputPath = path.join(versionDir, versionConfig.files.full);
 await writeFile(outputPath, completeHTML);
 console.log(outputPath);

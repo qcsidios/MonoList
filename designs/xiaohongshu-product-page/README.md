@@ -12,8 +12,9 @@
 - `01-3x4.png`：轮播第一张，与商品主图共享同一视觉概念。
 - `02.png`–`09.png`：其余 3:4 轮播图。
 - `10.png`：长详情页。
-- `versions/v2/full.html`：无外部依赖、可单独发送的完整 HTML。
-- `versions/v2/preview.html`：手机端与小尺寸主图预览。
+- `versions/v2/monolist-v2-master.html`：可持续修改的设计母版。
+- `versions/v2/monolist-v2-preview.html`：手机端与小尺寸主图预览。
+- `versions/v2/monolist-v2-full.html`：无外部依赖、可单独发送的完整 HTML。
 
 ## 版本记录
 
