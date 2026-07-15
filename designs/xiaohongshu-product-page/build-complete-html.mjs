@@ -23,6 +23,6 @@ const completeHTML = html
 const unresolved = completeHTML.match(/(?:src|href)="(?!data:|https?:|#)([^"]+)"/);
 if (unresolved) throw new Error(`完整 HTML 仍引用本地文件：${unresolved[1]}`);
 
-const outputPath = path.join(versionDir, `monolist-xhs-${version}-complete.html`);
+const outputPath = path.join(versionDir, "full.html");
 await writeFile(outputPath, completeHTML);
 console.log(outputPath);
