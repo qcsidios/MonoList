@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MonoList · Focus Lite 交互视觉稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202022;
+      --secondary: #737377;
+      --tertiary: #aaaab0;
+      --line: rgba(20, 20, 22, .10);
+      --line-strong: rgba(20, 20, 22, .17);
+      --control: #f2f2f3;
+      --canvas: #e7e7e9;
+      --panel: #fff;
+      --ease: cubic-bezier(.2, .75, .2, 1);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    button { font: inherit; }
+    button:focus-visible { outline: 2px solid rgba(32, 32, 34, .55); outline-offset: 2px; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background: #f2f2f3;
+    }
+
+    .page {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 36px 0 52px;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(27px, 4vw, 40px);
+      font-weight: 680;
+      letter-spacing: -.04em;
+    }
+
+    .intro {
+      max-width: 610px;
+      margin: 9px 0 0;
+      color: var(--secondary);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .principle {
+      max-width: 280px;
+      margin: 0;
+      color: var(--secondary);
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: right;
+    }
+
+    .principle strong { color: var(--ink); }
+
+    .toolbar {
+      display: flex;
+      gap: 5px;
+      width: fit-content;
+      max-width: 100%;
+      margin-bottom: 16px;
+      padding: 4px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255, 255, 255, .74);
+    }
+
+    .scenario {
+      min-height: 32px;
+      padding: 0 13px;
+      border: 0;
+      border-radius: 8px;
+      color: var(--secondary);
+      background: transparent;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: 150ms var(--ease);
+    }
+
+    .scenario:hover { color: var(--ink); background: rgba(0,0,0,.035); }
+    .scenario[aria-selected="true"] {
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.10);
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 258px;
+      min-height: 650px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: #f8f8f9;
+      box-shadow: 0 24px 70px rgba(0,0,0,.10);
+    }
+
+    .desktop {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 25% 25%, rgba(255,255,255,.84), transparent 34%),
+        linear-gradient(145deg, #dedfe1 0%, #c8cacf 54%, #bfc2c7 100%);
+    }
+
+    .desktop::after {
+      position: absolute;
+      inset: 26px;
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 24px;
+      content: "";
+      pointer-events: none;
+    }
+
+    .menubar {
+      position: relative;
+      z-index: 8;
+      display: flex;
+      height: 29px;
+      align-items: center;
+      padding: 0 15px;
+      border-bottom: 1px solid rgba(0,0,0,.07);
+      background: rgba(248,248,249,.84);
+      backdrop-filter: blur(22px);
+      font-size: 11px;
+      font-weight: 580;
+    }
+
+    .menu-left, .menu-right { display: flex; align-items: center; gap: 15px; }
+    .menu-right { margin-left: auto; gap: 13px; }
+    .apple { font-size: 13px; }
+    .status-item {
+      display: flex;
+      min-height: 22px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.07);
+    }
+    .status-ring { width: 7px; height: 7px; border: 1.5px solid currentColor; border-radius: 50%; }
+
+    .stage {
+      position: absolute;
+      z-index: 3;
+      inset: 29px 0 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .focus-panel, .list-panel {
+      position: relative;
+      width: 336px;
+      overflow: visible;
+      border: 1px solid rgba(0,0,0,.12);
+      border-top: 0;
+      border-radius: 0 0 14px 14px;
+      background: var(--panel);
+      box-shadow: 0 18px 42px rgba(0,0,0,.18), 0 2px 5px rgba(0,0,0,.10);
+      animation: panel-in 180ms var(--ease) both;
+    }
+
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-head {
+      display: flex;
+      height: 52px;
+      align-items: center;
+      padding: 0 14px 0 17px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-title { min-width: 0; }
+    .panel-title-row { display: flex; align-items: baseline; gap: 7px; }
+    .panel-title h2 { margin: 0; font-size: 15px; font-weight: 680; letter-spacing: -.015em; }
+    .progress { color: var(--tertiary); font-size: 11px; font-weight: 600; }
+    .panel-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+
+    .text-action, .icon-action {
+      border: 0;
+      color: var(--secondary);
+      background: transparent;
+      font-weight: 620;
+      cursor: pointer;
+    }
+    .text-action { min-height: 30px; padding: 0 9px; border-radius: 7px; font-size: 12px; }
+    .icon-action { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 8px; font-size: 17px; letter-spacing: .06em; }
+    .text-action:hover, .icon-action:hover { color: var(--ink); background: var(--control); }
+
+    .current {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr);
+      gap: 13px;
+      padding: 21px 18px 22px;
+    }
+
+    .check {
+      width: 25px;
+      height: 25px;
+      margin: 1px 0 0;
+      border: 1.7px solid #77777b;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+      transition: 160ms var(--ease);
+    }
+    .check:hover { border-color: var(--ink); background: var(--control); transform: scale(1.04); }
+
+    .label {
+      margin: 0 0 7px;
+      color: var(--tertiary);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .current-text {
+      margin: 0;
+      font-size: 19px;
+      font-weight: 650;
+      line-height: 1.42;
+      letter-spacing: -.018em;
+      overflow-wrap: anywhere;
+    }
+
+    .next-section { border-top: 1px solid var(--line); }
+    .next-label { padding: 13px 18px 6px 57px; color: var(--tertiary); font-size: 11px; font-weight: 650; }
+
+    .next-task {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 10px 18px 12px;
+      transition: 160ms var(--ease);
+    }
+    .next-task + .next-task { border-top: 1px solid rgba(20,20,22,.055); }
+    .next-task:hover { background: #fafafa; }
+    .next-task .check { width: 19px; height: 19px; margin-top: 1px; border-width: 1.5px; }
+    .next-text { font-size: 14px; line-height: 1.42; overflow-wrap: anywhere; }
+
+    .more-menu {
+      position: absolute;
+      z-index: 20;
+      top: 43px;
+      right: 10px;
+      width: 174px;
+      padding: 5px;
+      border: 1px solid rgba(0,0,0,.11);
+      border-radius: 10px;
+      background: rgba(255,255,255,.97);
+      box-shadow: 0 14px 36px rgba(0,0,0,.18);
+      backdrop-filter: blur(16px);
+      transform-origin: top right;
+      animation: menu-in 130ms var(--ease) both;
+    }
+    @keyframes menu-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+    .menu-item {
+      display: flex;
+      width: 100%;
+      min-height: 31px;
+      align-items: center;
+      padding: 0 9px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--ink);
+      background: transparent;
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .menu-item:hover { background: var(--control); }
+    .menu-separator { height: 1px; margin: 4px 5px; background: var(--line); }
+
+    .success {
+      display: grid;
+      min-height: 140px;
+      place-items: center;
+      padding: 28px;
+      text-align: center;
+    }
+    .success-mark { margin-bottom: 10px; font-size: 25px; }
+    .success h3 { margin: 0; font-size: 17px; font-weight: 650; }
+    .success p { margin: 7px 0 0; color: var(--secondary); font-size: 12px; }
+
+    .list-body { padding: 10px 0 14px; }
+    .list-note { padding: 3px 17px 10px; color: var(--secondary); font-size: 11px; }
+    .list-row { display: grid; grid-template-columns: 20px 1fr; gap: 11px; padding: 9px 17px; font-size: 13px; line-height: 1.45; }
+    .list-row .check { width: 18px; height: 18px; border-width: 1.4px; }
+    .back-focus {
+      margin-left: auto;
+      min-height: 30px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 7px;
+      color: var(--ink);
+      background: var(--control);
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .reminder-stage {
+      position: absolute;
+      z-index: 5;
+      inset: 29px 0 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 18px;
+    }
+
+    .reminder {
+      width: min(420px, calc(100% - 34px));
+      min-height: 150px;
+      padding: 20px 22px 21px;
+      border-radius: 17px;
+      background: #fff;
+      box-shadow: 0 24px 56px rgba(0,0,0,.21), 0 3px 9px rgba(0,0,0,.11);
+      cursor: pointer;
+      animation: reminder-in 220ms var(--ease) both;
+    }
+
+    @keyframes reminder-in {
+      from { opacity: 0; transform: translateY(-8px) scale(.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .reminder-top { display: flex; min-height: 26px; align-items: start; }
+    .reminder-kicker { font-size: 12px; font-weight: 680; letter-spacing: -.005em; }
+    .reminder-progress { margin-left: 8px; color: var(--tertiary); font-size: 12px; font-weight: 570; }
+    .reminder-close {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      margin: -5px -6px 0 auto;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      color: var(--secondary);
+      background: transparent;
+      font-size: 21px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .reminder-close:hover { color: var(--ink); background: var(--control); }
+    .reminder-task {
+      max-width: 350px;
+      margin: 17px 0 0;
+      font-size: 22px;
+      font-weight: 650;
+      line-height: 1.38;
+      letter-spacing: -.022em;
+      text-wrap: pretty;
+      overflow-wrap: anywhere;
+    }
+    .reminder.long { min-height: 196px; }
+    .reminder.long .reminder-task { margin-top: 14px; font-size: 20px; line-height: 1.42; }
+
+    .closed-note {
+      margin-top: 60px;
+      padding: 10px 14px;
+      border-radius: 9px;
+      color: var(--secondary);
+      background: rgba(255,255,255,.72);
+      font-size: 12px;
+    }
+
+    .notes {
+      padding: 25px 22px;
+      border-left: 1px solid var(--line);
+      background: #fafafa;
+    }
+    .notes h2 { margin: 0 0 15px; font-size: 14px; font-weight: 680; }
+    .note-block { padding: 14px 0; border-top: 1px solid var(--line); }
+    .note-block:first-of-type { padding-top: 0; border-top: 0; }
+    .note-block h3 { margin: 0 0 6px; font-size: 11px; font-weight: 700; }
+    .note-block p { margin: 0; color: var(--secondary); font-size: 11px; line-height: 1.65; }
+    .note-block strong { color: var(--ink); }
+    .replay {
+      width: 100%;
+      min-height: 34px;
+      margin-top: 16px;
+      border: 0;
+      border-radius: 8px;
+      color: var(--ink);
+      background: var(--control);
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .replay:hover { background: #e8e8ea; }
+
+    .toast {
+      position: absolute;
+      z-index: 30;
+      right: 18px;
+      bottom: 18px;
+      padding: 8px 11px;
+      border-radius: 8px;
+      color: #fff;
+      background: rgba(26,26,28,.90);
+      font-size: 11px;
+      animation: toast 1800ms var(--ease) both;
+    }
+    @keyframes toast { 0% { opacity: 0; transform: translateY(4px); } 12%,78% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+    @media (max-width: 780px) {
+      .page { width: min(100% - 22px, 620px); padding-top: 22px; }
+      .page-head { align-items: start; flex-direction: column; gap: 8px; }
+      .principle { max-width: none; text-align: left; }
+      .workbench { grid-template-columns: 1fr; }
+      .desktop { min-height: 590px; }
+      .notes { border-top: 1px solid var(--line); border-left: 0; }
+      .menu-left span:not(.apple), .menu-right > span:not(.status-item):not(:last-child) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">MonoList / Focus Lite</p>
+        <h1>只让“现在做什么”更清楚</h1>
+        <p class="intro">专注不是第二套任务系统，而是普通待办的一层执行视图。界面只保留当前一件、随后两件和返回全部待办的出口。</p>
+      </div>
+      <p class="principle"><strong>提醒强度来自排版，不来自颜色。</strong><br>更大的任务标题、固定位置、一次性轻动效。</p>
+    </header>
+
+    <nav class="toolbar" aria-label="预览场景">
+      <button class="scenario" data-scene="one" aria-selected="true">1 件任务</button>
+      <button class="scenario" data-scene="three" aria-selected="false">3 件任务</button>
+      <button class="scenario" data-scene="long" aria-selected="false">长任务</button>
+      <button class="scenario" data-scene="reminder" aria-selected="false">专注提醒</button>
+      <button class="scenario" data-scene="reminder-long" aria-selected="false">长文提醒</button>
+      <button class="scenario" data-scene="done" aria-selected="false">全部完成</button>
+    </nav>
+
+    <section class="workbench">
+      <div class="desktop">
+        <div class="menubar">
+          <div class="menu-left"><span class="apple">●</span><strong>Finder</strong><span>文件</span><span>编辑</span></div>
+          <div class="menu-right"><span class="status-item"><i class="status-ring"></i><b id="menuCount">专注 1</b></span><span>⌁</span><span>82%</span><span>7月20日 周一 10:24</span></div>
+        </div>
+        <div id="stage" class="stage"></div>
+      </div>
+
+      <aside class="notes">
+        <h2>这一版删掉了什么</h2>
+        <div class="note-block">
+          <h3>操作层级</h3>
+          <p>顶栏只保留<strong>全部</strong>和<strong>更多</strong>。调整、新增、设置和结束专注收进更多菜单。</p>
+        </div>
+        <div class="note-block">
+          <h3>窗口高度</h3>
+          <p>不再为三件任务预留固定空白。1、2、3 件分别由内容撑开，当前任务始终是视觉中心。</p>
+        </div>
+        <div class="note-block">
+          <h3>提醒显著性</h3>
+          <p>420 pt 宽、22 pt 任务标题、菜单栏下方居中。出现时只轻微下落一次，不循环跳动。</p>
+        </div>
+        <div class="note-block">
+          <h3>交互说明</h3>
+          <p>完成圆圈可推进任务；“全部”可查看完整待办，再用<strong>返回专注</strong>回到原进度；提醒主体可直接回到专注。</p>
+        </div>
+        <button id="replay" class="replay" type="button">重播当前状态</button>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const taskSets = {
+      one: ["票根小程序开发"],
+      three: [
+        "票根小程序开发",
+        "整理本周发布说明",
+        "回复设计评审意见"
+      ],
+      long: [
+        "调研沉浸式翻译的技术路线，确认整个网页同时翻译时，原文结构、图片和页面交互是否都能完整保留并正常运行",
+        "整理 MonoList 新版本发布说明",
+        "回复今天收到的三个关键问题"
+      ]
+    };
+
+    const fullList = [
+      "票根小程序开发",
+      "整理本周发布说明",
+      "回复设计评审意见",
+      "检查 LangSwitch 翻译边界",
+      "整理下周的产品想法"
+    ];
+
+    const state = { scene: "one", index: 0, menuOpen: false, reminderClosed: false, listOpen: false, toast: "" };
+    const stage = document.getElementById("stage");
+    const menuCount = document.getElementById("menuCount");
+
+    function selectedTasks() {
+      if (state.scene === "one") return taskSets.one;
+      if (state.scene === "long" || state.scene === "reminder-long") return taskSets.long;
+      return taskSets.three;
+    }
+
+    function moreMenu() {
+      if (!state.menuOpen) return "";
+      return `<div class="more-menu">
+        <button class="menu-item" data-action="adjust">调整今日专注</button>
+        <button class="menu-item" data-action="add">新增待办</button>
+        <button class="menu-item" data-action="settings">设置</button>
+        <div class="menu-separator"></div>
+        <button class="menu-item" data-action="end">结束专注</button>
+      </div>`;
+    }
+
+    function focusPanel(tasks, forceDone = false) {
+      const completed = forceDone ? tasks.length : state.index;
+      const current = tasks[completed];
+      const next = tasks.slice(completed + 1, completed + 3);
+      const progress = `${Math.min(completed + 1, tasks.length)}/${tasks.length}`;
+      menuCount.textContent = current ? `专注 ${tasks.length - completed}` : "专注完成";
+
+      const content = current ? `
+        <div class="current">
+          <button class="check" data-action="complete" aria-label="完成当前任务"></button>
+          <div><p class="label">当前</p><p class="current-text">${current}</p></div>
+        </div>
+        ${next.length ? `<div class="next-section"><div class="next-label">接下来</div>${next.map((task, i) => `
+          <div class="next-task">
+            <button class="check" data-action="complete-next" data-offset="${i + 1}" aria-label="完成这项任务"></button>
+            <div class="next-text">${task}</div>
+          </div>`).join("")}</div>` : ""}` : `
+        <div class="success"><div><div class="success-mark">✓</div><h3>今天的专注已完成</h3><p>剩余待办仍在“全部”里。</p></div></div>`;
+
+      return `<div class="focus-panel">
+        <header class="panel-head">
+          <div class="panel-title"><div class="panel-title-row"><h2>今日专注</h2><span class="progress">${current ? progress : `${tasks.length}/${tasks.length}`}</span></div></div>
+          <div class="panel-actions">
+            <button class="text-action" data-action="all">全部</button>
+            <button class="icon-action" data-action="menu" aria-label="更多">•••</button>
+          </div>
+        </header>
+        ${content}${moreMenu()}
+      </div>`;
+    }
+
+    function listPanel() {
+      menuCount.textContent = `待办 ${fullList.length}`;
+      return `<div class="list-panel">
+        <header class="panel-head">
+          <div class="panel-title"><div class="panel-title-row"><h2>今日待办</h2><span class="progress">${fullList.length} 项</span></div></div>
+          <button class="back-focus" data-action="back-focus">返回专注</button>
+        </header>
+        <div class="list-body"><div class="list-note">专注仍在进行，查看全部不会退出。</div>${fullList.map(task => `<div class="list-row"><button class="check" aria-label="完成"></button><span>${task}</span></div>`).join("")}</div>
+      </div>`;
+    }
+
+    function reminder(long = false) {
+      menuCount.textContent = "专注 3";
+      if (state.reminderClosed) return `<div class="closed-note">提醒已关闭 · 点击“重播当前状态”再次查看</div>`;
+      const text = long ? taskSets.long[0] : "票根小程序开发";
+      return `<div class="reminder ${long ? "long" : ""}" data-action="open-focus">
+        <div class="reminder-top">
+          <span class="reminder-kicker">当前专注</span><span class="reminder-progress">1/3</span>
+          <button class="reminder-close" data-action="close" aria-label="关闭">×</button>
+        </div>
+        <p class="reminder-task">${text}</p>
+      </div>`;
+    }
+
+    function render() {
+      document.querySelectorAll(".scenario").forEach(button => button.setAttribute("aria-selected", String(button.dataset.scene === state.scene)));
+      stage.className = state.scene.startsWith("reminder") ? "reminder-stage" : "stage";
+      let html;
+      if (state.scene === "reminder" || state.scene === "reminder-long") html = reminder(state.scene === "reminder-long");
+      else if (state.listOpen) html = listPanel();
+      else html = focusPanel(selectedTasks(), state.scene === "done");
+      stage.innerHTML = html + (state.toast ? `<div class="toast">${state.toast}</div>` : "");
+      if (state.toast) setTimeout(() => { state.toast = ""; render(); }, 1800);
+    }
+
+    function resetScene(scene = state.scene) {
+      state.scene = scene;
+      state.index = 0;
+      state.menuOpen = false;
+      state.reminderClosed = false;
+      state.listOpen = false;
+      state.toast = "";
+      render();
+    }
+
+    document.querySelector(".toolbar").addEventListener("click", event => {
+      const button = event.target.closest(".scenario");
+      if (button) resetScene(button.dataset.scene);
+    });
+
+    stage.addEventListener("click", event => {
+      const target = event.target.closest("[data-action]");
+      if (!target) return;
+      const action = target.dataset.action;
+      if (action === "complete") {
+        state.index = Math.min(state.index + 1, selectedTasks().length);
+        state.menuOpen = false;
+      } else if (action === "complete-next") {
+        state.toast = "随后任务已完成";
+      } else if (action === "menu") {
+        state.menuOpen = !state.menuOpen;
+      } else if (action === "all") {
+        state.listOpen = true;
+        state.menuOpen = false;
+      } else if (action === "back-focus") {
+        state.listOpen = false;
+      } else if (action === "close") {
+        event.stopPropagation();
+        state.reminderClosed = true;
+      } else if (action === "open-focus") {
+        resetScene(state.scene === "reminder-long" ? "long" : "three");
+        return;
+      } else if (["adjust", "add", "settings", "end"].includes(action)) {
+        const copy = { adjust: "进入调整专注", add: "打开新增待办", settings: "打开设置", end: "专注已结束" };
+        state.menuOpen = false;
+        state.toast = copy[action];
+      }
+      render();
+    });
+
+    document.getElementById("replay").addEventListener("click", () => resetScene());
+    render();
+  </script>
+</body>
+</html>

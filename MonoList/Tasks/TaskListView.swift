@@ -84,6 +84,10 @@ struct TaskListView: View {
         return activeFocusIDs.compactMap { tasksByID[$0] }
     }
 
+    private var pendingFocusTasks: [TaskItem] {
+        activeFocusTasks.filter { $0.status == .pending }
+    }
+
     private var lockedFocusTasks: [TaskItem] {
         activeFocusTasks.filter { $0.status == .history }
     }
@@ -97,7 +101,7 @@ struct TaskListView: View {
     }
 
     private var shouldShowFocusEntry: Bool {
-        focusStore.isActive(at: currentDate) || !store.pendingTasks.isEmpty
+        !focusStore.isActive(at: currentDate) && !store.pendingTasks.isEmpty
     }
 
     private var yesterdaySuggestionIDs: Set<UUID> {
@@ -135,7 +139,10 @@ struct TaskListView: View {
 
     private var preferredHeight: CGFloat {
         if displayMode == .focus {
-            return 348
+            return Self.focusContentHeight(
+                for: activeFocusTasks,
+                showsCapture: focusCapturePresented
+            )
         }
         if displayMode == .selection {
             let selectionRows = store.pendingTasks.count + lockedFocusTasks.count
@@ -303,6 +310,16 @@ struct TaskListView: View {
     }
 
     private var header: some View {
+        Group {
+            if focusStore.isActive(at: currentDate) {
+                activeFocusListHeader
+            } else {
+                standardListHeader
+            }
+        }
+    }
+
+    private var standardListHeader: some View {
         HStack(spacing: 7) {
             Text("今天")
                 .font(.system(size: 17, weight: .semibold))
@@ -362,6 +379,51 @@ struct TaskListView: View {
         .padding(.leading, 14)
         .padding(.trailing, 9)
         .frame(height: 54)
+    }
+
+    private var activeFocusListHeader: some View {
+        HStack(spacing: 7) {
+            Text("全部待办")
+                .font(.system(size: 15, weight: .semibold))
+            WindowDragArea()
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+            Button("返回专注") {
+                commitDraft()
+                displayMode = .focus
+                focusKeyboardID = currentFocusTask?.id
+                onFocusInteraction()
+            }
+            .buttonStyle(FocusHeaderTextButtonStyle())
+
+            Menu {
+                Button("新增待办") {
+                    commitDraft()
+                    focusDraft(after: store.shortTermTasks.last?.id)
+                }
+                Button("打开控制台") {
+                    commitDraft()
+                    onOpenSettings()
+                }
+                Divider()
+                Button("清空未完成任务") { clearAction = .pending }
+                    .disabled(store.pendingTasks.isEmpty)
+                Button("清空已完成任务") { clearAction = .completed }
+                    .disabled(store.historyTasks.isEmpty)
+                Button("清空全部任务", role: .destructive) { clearAction = .all }
+                    .disabled(store.tasks.isEmpty)
+            } label: {
+                HeaderIconLabel(systemName: "ellipsis")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .buttonStyle(HeaderIconButtonStyle())
+            .frame(width: 30, height: 30)
+            .help("更多操作")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 9)
+        .frame(height: 52)
     }
 
     private var focusEntry: some View {
@@ -620,45 +682,47 @@ struct TaskListView: View {
         let allCompleted = !activeFocusTasks.isEmpty && currentFocusTask == nil
         return HStack(spacing: 7) {
             Text(allCompleted ? "今日完成" : "今日专注")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
             Text("\(progress)/\(activeFocusTasks.count)")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
             WindowDragArea()
                 .frame(maxWidth: .infinity)
                 .frame(height: 30)
-            Button("调整") {
-                beginFocusSelection(origin: .focus)
-            }
-            .buttonStyle(FocusHeaderTextButtonStyle())
-            .accessibilityHint("重新选择或排序今天的专注任务")
             Button("全部") {
                 displayMode = .list
                 onFocusInteraction()
             }
-            .buttonStyle(FocusHeaderTextButtonStyle())
-            .accessibilityHint("查看全部待办，可通过继续专注返回")
-            Button {
-                focusCapturePresented.toggle()
-                focusCaptureFocused = focusCapturePresented
+            .buttonStyle(FocusQuietTextButtonStyle())
+            .accessibilityHint("查看全部待办，可通过返回专注回到当前进度")
+            Menu {
+                Button("调整今日专注") {
+                    beginFocusSelection(origin: .focus)
+                }
+                Button("新增待办") {
+                    focusCapturePresented = true
+                    focusCaptureFocused = true
+                }
+                Button("打开控制台") {
+                    onOpenSettings()
+                }
+                Divider()
+                Button("结束专注") {
+                    endFocus()
+                }
             } label: {
-                HeaderIconLabel(systemName: "plus")
+                HeaderIconLabel(systemName: "ellipsis")
             }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .buttonStyle(HeaderIconButtonStyle())
-            .help("新增待办")
-            .accessibilityLabel("新增待办")
-            Button {
-                onOpenSettings()
-            } label: {
-                HeaderIconLabel(systemName: "gearshape")
-            }
-            .buttonStyle(HeaderIconButtonStyle())
-            .help("打开控制台")
-            .accessibilityLabel("打开控制台")
+            .frame(width: 30, height: 30)
+            .help("更多操作")
+            .accessibilityLabel("更多操作")
         }
-        .padding(.leading, 14)
+        .padding(.leading, 17)
         .padding(.trailing, 9)
-        .frame(height: 54)
+        .frame(height: 52)
     }
 
     private var focusCaptureRow: some View {
@@ -682,94 +746,92 @@ struct TaskListView: View {
     private var focusTaskContent: some View {
         VStack(spacing: 0) {
             if let currentFocusTask {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: 13) {
                     Button {
                         completeFocusTask(currentFocusTask)
                     } label: {
                         Image(systemName: "circle")
-                            .font(.system(size: 23, weight: .regular))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28, height: 28)
+                            .font(.system(size: 24, weight: .regular))
+                            .foregroundStyle(
+                                focusKeyboardID == currentFocusTask.id
+                                    ? .primary : .secondary
+                            )
+                            .frame(width: 26, height: 26)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("完成当前任务")
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("当前任务")
-                            .font(.system(size: 10, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("当前")
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.tertiary)
                         Text(currentFocusTask.text)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 19, weight: .semibold))
                             .lineLimit(3)
+                            .lineSpacing(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .padding(.horizontal, 19)
-                .padding(.top, 20)
-                .padding(.bottom, 17)
-                .frame(minHeight: 142, alignment: .top)
-                .background(
-                    focusKeyboardID == currentFocusTask.id
-                        ? Color.primary.opacity(0.045) : .clear,
-                    in: RoundedRectangle(cornerRadius: 10)
-                )
+                .padding(.horizontal, 18)
+                .padding(.top, 21)
+                .padding(.bottom, 22)
                 .contextMenu {
                     Button("删除", role: .destructive) {
                         deleteFocusTask(currentFocusTask)
                     }
                 }
-                Divider().padding(.horizontal, 14)
-                Text("随后")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 19)
-                    .padding(.top, 11)
-                ForEach(activeFocusTasks.filter { $0.id != currentFocusTask.id }) { item in
-                    focusFollowingRow(item)
+                if pendingFocusTasks.count > 1 {
+                    Divider().opacity(0.45)
+                    Text("接下来")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 57)
+                        .padding(.top, 12)
+                        .padding(.bottom, 3)
+                    ForEach(pendingFocusTasks.dropFirst()) { item in
+                        focusFollowingRow(item)
+                    }
                 }
             } else {
-                ForEach(activeFocusTasks) { item in
-                    focusFollowingRow(item)
+                VStack(spacing: 9) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 22, weight: .medium))
+                    Text("今天的专注已完成")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("剩余待办仍在“全部”里")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 8)
-                Text("今天的重要事项已经完成\n轻提醒已停止")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 18)
+                .frame(maxWidth: .infinity, minHeight: 140)
             }
             Spacer(minLength: 8)
         }
     }
 
     private func focusFollowingRow(_ item: TaskItem) -> some View {
-        let completed = item.status == .history
         return HStack(spacing: 10) {
             Button {
-                toggleFocusTaskCompletion(item)
+                completeFocusTask(item)
             } label: {
-                Image(systemName: completed ? "checkmark.circle.fill" : "circle")
+                Image(systemName: "circle")
                     .font(.system(size: 19))
-                    .foregroundStyle(completed ? .primary : .secondary)
+                    .foregroundStyle(
+                        focusKeyboardID == item.id ? .primary : .secondary
+                    )
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(completed ? "恢复任务" : "完成任务")
+            .accessibilityLabel("完成任务")
             Text(item.text)
-                .font(.system(size: completed ? 13 : 14))
-                .foregroundStyle(completed ? .tertiary : .primary)
-                .strikethrough(completed)
+                .font(.system(size: 14))
                 .lineLimit(2)
+                .lineSpacing(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 19)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 9)
         .frame(minHeight: 47)
         .contentShape(Rectangle())
-        .background(
-            focusKeyboardID == item.id ? Color.primary.opacity(0.045) : .clear,
-            in: RoundedRectangle(cornerRadius: 9)
-        )
         .contextMenu {
             Button("删除", role: .destructive) {
                 deleteFocusTask(item)
@@ -1054,10 +1116,7 @@ struct TaskListView: View {
     private func saveFocusSelection() {
         do {
             if focusSelectionDraft.isEmpty {
-                try focusStore.clearSelection()
-                displayMode = .list
-                focusKeyboardID = nil
-                onFocusInteraction()
+                endFocus()
                 return
             }
             try focusStore.setSelection(
@@ -1068,6 +1127,22 @@ struct TaskListView: View {
             )
             displayMode = .focus
             focusKeyboardID = currentFocusTask?.id
+            onFocusInteraction()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func endFocus() {
+        do {
+            try focusStore.clearSelection()
+            focusSelectionDraft.removeAll()
+            focusSelectionSnapshot.removeAll()
+            focusKeyboardID = nil
+            focusCapturePresented = false
+            focusCaptureText = ""
+            focusCaptureFocused = false
+            displayMode = .list
             onFocusInteraction()
         } catch {
             errorMessage = error.localizedDescription
@@ -1192,6 +1267,63 @@ struct TaskListView: View {
         let lineHeight = font.boundingRectForFont.height
         let lineCount = max(1, Int(round(bounds.height / lineHeight)))
         return max(0, min(lineCount, 6) - 1)
+    }
+
+    static func focusContentHeight(
+        for tasks: [TaskItem],
+        showsCapture: Bool = false
+    ) -> CGFloat {
+        let pendingTasks = tasks.filter { $0.status == .pending }
+        let captureHeight: CGFloat = showsCapture ? 44 : 0
+        guard let currentTask = pendingTasks.first else {
+            return 201 + captureHeight
+        }
+
+        let currentExtraLines = focusAdditionalLines(
+            for: currentTask.text,
+            fontSize: 19,
+            width: 241,
+            limit: 3
+        )
+        let followingTasks = Array(pendingTasks.dropFirst().prefix(2))
+        let followingExtraHeight = followingTasks.reduce(CGFloat.zero) { height, task in
+            let extraLines = focusAdditionalLines(
+                for: task.text,
+                fontSize: 14,
+                width: 248,
+                limit: 2
+            )
+            return height + 47 + CGFloat(extraLines * 20)
+        }
+        let followingSectionHeight: CGFloat = followingTasks.isEmpty
+            ? 0
+            : 31 + followingExtraHeight
+        let height = 155 +
+            CGFloat(currentExtraLines * 27) +
+            followingSectionHeight +
+            captureHeight
+        return min(
+            max(ceil(height), WindowCoordinator.mainPanelMinimumHeight),
+            WindowCoordinator.mainPanelMaximumHeight
+        )
+    }
+
+    private static func focusAdditionalLines(
+        for text: String,
+        fontSize: CGFloat,
+        width: CGFloat,
+        limit: Int
+    ) -> Int {
+        guard !text.isEmpty else { return 0 }
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+        let bounds = (text as NSString).boundingRect(
+            with: NSSize(width: width, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        let lineHeight = font.boundingRectForFont.height
+        let lineCount = max(1, Int(ceil(bounds.height / lineHeight)))
+        return max(0, min(lineCount, limit) - 1)
     }
 
     static func contentHeight(
@@ -1351,6 +1483,21 @@ private struct FocusHeaderTextButtonStyle: ButtonStyle {
             .background(
                 Color.primary.opacity(configuration.isPressed ? 0.09 : 0.055),
                 in: RoundedRectangle(cornerRadius: 8)
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+    }
+}
+
+private struct FocusQuietTextButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(configuration.isPressed ? Color.primary : Color.secondary)
+            .padding(.horizontal, 9)
+            .frame(height: 30)
+            .background(
+                configuration.isPressed ? Color.primary.opacity(0.06) : .clear,
+                in: RoundedRectangle(cornerRadius: 7)
             )
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
     }

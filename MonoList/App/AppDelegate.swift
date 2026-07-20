@@ -251,6 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuBarButton: nil,
             title: focusPresentation?.title ?? "待办提醒",
             statusText: focusPresentation?.statusText,
+            isFocusReminder: focusPresentation != nil,
             testing: testing,
             playsSound: settings.reminderSoundEnabled,
             soundName: settings.reminderSoundName,

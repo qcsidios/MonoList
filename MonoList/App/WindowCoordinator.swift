@@ -360,9 +360,15 @@ final class WindowCoordinator {
     }
 
     private func makeMainPanel() -> MainPanel {
-        let initialHeight = focusStore.isActive()
-            ? 348
-            : max(
+        let initialHeight: CGFloat
+        if focusStore.isActive() {
+            let tasksByID = Dictionary(
+                uniqueKeysWithValues: taskStore.tasks.map { ($0.id, $0) }
+            )
+            let focusTasks = focusStore.taskIDs().compactMap { tasksByID[$0] }
+            initialHeight = TaskListView.focusContentHeight(for: focusTasks)
+        } else {
+            initialHeight = max(
                 148,
                 Self.preferredMainPanelHeight(
                     pendingCount: taskStore.pendingTasks.count,
@@ -370,6 +376,7 @@ final class WindowCoordinator {
                     olderVisibleCount: 0
                 )
             )
+        }
         let panel = MainPanel(
             contentRect: NSRect(
                 x: 0,

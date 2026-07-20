@@ -164,6 +164,22 @@ struct ReminderSchedulerSmoke {
         reminderView.layoutSubtreeIfNeeded()
         precondition(reminderView.fittingSize.height < 110)
 
+        let focusReminderView = NSHostingView(
+            rootView: ReminderView(
+                title: "当前专注",
+                statusText: "1/3",
+                isFocusReminder: true,
+                totalCount: 1,
+                taskTexts: ["调研沉浸式翻译的技术路线，确认页面结构和交互可以完整保留"],
+                model: reminderModel,
+                onOpen: {},
+                onClose: {}
+            )
+        )
+        focusReminderView.layoutSubtreeIfNeeded()
+        precondition(focusReminderView.fittingSize.width == 420)
+        precondition(focusReminderView.fittingSize.height >= 150)
+
         let appDelegateSource = try! String(
             contentsOfFile: "MonoList/App/AppDelegate.swift",
             encoding: .utf8
@@ -208,6 +224,22 @@ struct ReminderSchedulerSmoke {
         precondition(controller.isTesting)
         precondition((controller.currentPanelHeight ?? 0) < 110)
         precondition(playedSounds == ["Ping"])
+        controller.close(animated: false)
+        controller.show(
+            tasks: testTasks,
+            position: .topCenter,
+            menuBarButton: nil,
+            title: "当前专注",
+            statusText: "1/1",
+            isFocusReminder: true,
+            testing: true,
+            playsSound: false,
+            onOpen: {},
+            onClose: {}
+        )
+        precondition(controller.currentPanelWidth == 420)
+        precondition((controller.currentPanelHeight ?? 0) >= 150)
+        controller.close(animated: false)
         controller.show(
             tasks: testTasks,
             position: .topCenter,

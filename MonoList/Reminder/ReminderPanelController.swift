@@ -25,6 +25,10 @@ final class ReminderPanelController: ObservableObject {
         panel?.frame.height
     }
 
+    var currentPanelWidth: CGFloat? {
+        panel?.frame.width
+    }
+
     static func resolvedSoundName(_ preferredName: String) -> String {
         NSSound(named: NSSound.Name(preferredName)) == nil ? "Glass" : preferredName
     }
@@ -63,6 +67,7 @@ final class ReminderPanelController: ObservableObject {
         menuBarButton: NSStatusBarButton?,
         title: String = "待办提醒",
         statusText: String? = nil,
+        isFocusReminder: Bool = false,
         testing: Bool = false,
         playsSound: Bool = true,
         soundName: String = "Glass",
@@ -81,6 +86,7 @@ final class ReminderPanelController: ObservableObject {
             rootView: ReminderView(
                 title: title,
                 statusText: statusText,
+                isFocusReminder: isFocusReminder,
                 totalCount: tasks.count,
                 taskTexts: snapshot.map(\.text),
                 model: model,
@@ -94,8 +100,9 @@ final class ReminderPanelController: ObservableObject {
             )
         )
         let contentHeight = ceil(hostingView.fittingSize.height)
+        let panelWidth: CGFloat = isFocusReminder ? 420 : 340
         let panel = PassiveReminderPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: contentHeight),
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: contentHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false

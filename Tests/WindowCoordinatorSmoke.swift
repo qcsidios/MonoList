@@ -89,6 +89,34 @@ struct WindowCoordinatorSmoke {
                 olderVisibleCount: 0
             ) == 430
         )
+        let focusNow = Date()
+        let focusTasks = [
+            TaskItem(
+                id: UUID(), text: "完成票根小程序开发", status: .pending,
+                order: 0, createdAt: focusNow, updatedAt: focusNow, completedAt: nil
+            ),
+            TaskItem(
+                id: UUID(), text: "整理本周发布说明", status: .pending,
+                order: 1, createdAt: focusNow, updatedAt: focusNow, completedAt: nil
+            ),
+            TaskItem(
+                id: UUID(), text: "回复设计评审意见", status: .pending,
+                order: 2, createdAt: focusNow, updatedAt: focusNow, completedAt: nil
+            ),
+        ]
+        let oneFocusHeight = TaskListView.focusContentHeight(
+            for: Array(focusTasks.prefix(1))
+        )
+        let threeFocusHeight = TaskListView.focusContentHeight(for: focusTasks)
+        precondition(oneFocusHeight == 155)
+        precondition(threeFocusHeight > oneFocusHeight)
+        precondition(threeFocusHeight < 348)
+        precondition(
+            TaskListView.focusContentHeight(
+                for: Array(focusTasks.prefix(1)),
+                showsCapture: true
+            ) == oneFocusHeight + 44
+        )
         precondition(
             TaskListView.additionalLines(
                 for: "shotlens升级。线上部署，把key放入安全环境。控制台 UI比例调整。"
