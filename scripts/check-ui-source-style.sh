@@ -193,4 +193,21 @@ if ! grep -q 'showsOtherTasks = false' "$TASK_LIST" ||
   exit 1
 fi
 
+if ! grep -q '_showsOtherTasks = State(initialValue: !focusStore.isActive())' "$TASK_LIST"; then
+  echo "主窗口首次渲染必须直接使用当前专注状态，不能展开后再收起。" >&2
+  exit 1
+fi
+
+if grep -qE 'startFrame\.origin\.y \+= 4|targetFrame\.origin\.y \+= 4' "$WINDOW_COORDINATOR" ||
+   grep -q 'panel\.animator()\.setFrame(finalFrame' "$WINDOW_COORDINATOR"; then
+  echo "主窗口显隐不能移动上边缘，也不能用旧尺寸覆盖动态高度。" >&2
+  exit 1
+fi
+
+if ! grep -q 'weak var panelReference: MainPanel?' "$WINDOW_COORDINATOR" ||
+   ! grep -q 'max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight)' "$WINDOW_COORDINATOR"; then
+  echo "主窗口显示前必须以真实内容高度完成唯一一次初始定高。" >&2
+  exit 1
+fi
+
 echo "UI source style check passed."

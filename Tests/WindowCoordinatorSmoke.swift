@@ -66,6 +66,14 @@ struct WindowCoordinatorSmoke {
         )
         precondition(halfwayFrame.height == 220)
         precondition(halfwayFrame.maxY == originalFrame.maxY)
+        var changingFrame = originalFrame
+        for height: CGFloat in [216, 263, 341, 447, 341, 216] {
+            changingFrame = WindowCoordinator.mainPanelFrame(
+                keepingTopOf: changingFrame,
+                height: height
+            )
+            precondition(changingFrame.maxY == originalFrame.maxY)
+        }
         precondition(WindowCoordinator.requiresScrolling(contentHeight: 479))
         precondition(WindowCoordinator.requiresScrolling(contentHeight: 481))
         precondition(
@@ -195,6 +203,23 @@ struct WindowCoordinatorSmoke {
         )
         precondition(taskListSource.contains("withAnimation("))
         precondition(taskListSource.contains(".easeOut(duration: 0.16)"))
+        precondition(
+            taskListSource.contains(
+                "_showsOtherTasks = State(initialValue: !focusStore.isActive())"
+            )
+        )
+        let windowCoordinatorSource = try String(
+            contentsOfFile: "MonoList/App/WindowCoordinator.swift",
+            encoding: .utf8
+        )
+        precondition(windowCoordinatorSource.contains("weak var panelReference"))
+        precondition(!windowCoordinatorSource.contains("startFrame.origin.y += 4"))
+        precondition(!windowCoordinatorSource.contains("targetFrame.origin.y += 4"))
+        precondition(
+            !windowCoordinatorSource.contains(
+                "panel.animator().setFrame(finalFrame, display: true)"
+            )
+        )
         let taskRowSource = try String(
             contentsOfFile: "MonoList/Tasks/TaskRowView.swift",
             encoding: .utf8
@@ -290,9 +315,25 @@ struct WindowCoordinatorSmoke {
         precondition(draft.isPresented)
         precondition(draft.text.isEmpty)
         precondition(draft.afterID == continuedItem?.id)
-        coordinator.showMainPanel(at: NSPoint(x: 500, y: 500))
+        let existingWindows = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let testAnchor = NSPoint(x: 500, y: 500)
+        coordinator.showMainPanel(at: testAnchor)
         precondition(coordinator.isMainPanelVisible)
-        coordinator.closeMainPanel()
+        guard let displayedMainWindow = NSApp.windows.first(where: {
+            !existingWindows.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        precondition(abs(displayedMainWindow.frame.maxY - testAnchor.y) < 0.5)
+        for index in 0..<5 {
+            try store.add(text: "动态高度测试 \(index)")
+        }
+        let resizeDeadline = Date().addingTimeInterval(0.35)
+        while Date() < resizeDeadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            precondition(abs(displayedMainWindow.frame.maxY - testAnchor.y) < 0.5)
+        }
+        coordinator.closeMainPanel(animated: false)
         precondition(!coordinator.isMainPanelVisible)
 
         print("Window coordinator smoke passed.")

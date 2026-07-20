@@ -228,9 +228,7 @@ final class WindowCoordinator {
             width: panel.frame.width,
             height: panel.frame.height
         )
-        var startFrame = finalFrame
-        startFrame.origin.y += 4
-        panel.setFrame(startFrame, display: false)
+        panel.setFrame(finalFrame, display: false)
         panel.alphaValue = 0
         mainPanel = panel
         NSApp.activate(ignoringOtherApps: true)
@@ -240,14 +238,6 @@ final class WindowCoordinator {
             context.duration = 0.20
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
-            panel.animator().setFrame(finalFrame, display: true)
-        } completionHandler: { [weak self, weak panel] in
-            Task { @MainActor in
-                guard let self,
-                      let panel,
-                      self.mainPanel === panel else { return }
-                panel.setFrame(finalFrame, display: true)
-            }
         }
         DispatchQueue.main.async { [weak self, weak panel] in
             guard let self, let panel, self.mainPanel === panel else { return }
@@ -270,13 +260,10 @@ final class WindowCoordinator {
         let panel = mainPanel
         mainPanel = nil
         if animated, let panel, panel.isVisible {
-            var targetFrame = panel.frame
-            targetFrame.origin.y += 4
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.16
                 context.timingFunction = CAMediaTimingFunction(name: .easeIn)
                 panel.animator().alphaValue = 0
-                panel.animator().setFrame(targetFrame, display: true)
             } completionHandler: {
                 panel.orderOut(nil)
             }
@@ -360,45 +347,7 @@ final class WindowCoordinator {
     }
 
     private func makeMainPanel() -> MainPanel {
-        let initialHeight: CGFloat
-        if focusStore.isActive() {
-            let tasksByID = Dictionary(
-                uniqueKeysWithValues: taskStore.tasks.map { ($0.id, $0) }
-            )
-            let focusTasks = focusStore.taskIDs().compactMap { tasksByID[$0] }
-            initialHeight = TaskListView.focusContentHeight(for: focusTasks)
-        } else {
-            initialHeight = max(
-                148,
-                Self.preferredMainPanelHeight(
-                    pendingCount: taskStore.pendingTasks.count,
-                    todayCompletedCount: taskStore.completedTasks(on: Date()).count,
-                    olderVisibleCount: 0
-                )
-            )
-        }
-        let panel = MainPanel(
-            contentRect: NSRect(
-                x: 0,
-                y: 0,
-                width: Self.mainPanelWidth,
-                height: initialHeight
-            ),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        panel.canBecomeKeyOverride = true
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = false
-        panel.level = .floating
-        panel.collectionBehavior = [.transient, .moveToActiveSpace]
-        panel.onCancel = { [weak self] in
-            self?.closeMainPanel(restoringFocus: true)
-        }
+        weak var panelReference: MainPanel?
         let hostingView = MainPanelHostingView(
             rootView: TaskListView(
                 store: taskStore,
@@ -414,22 +363,40 @@ final class WindowCoordinator {
                 onFocusInteraction: { [weak self] in
                     self?.onFocusInteraction?()
                 },
-                onHeightChanged: { [weak self, weak panel] height in
-                    guard let self, let panel else { return }
+                onHeightChanged: { [weak self] height in
+                    guard let self, let panel = panelReference else { return }
                     self.resizeMainPanel(panel, to: height)
                 }
             )
         )
-        panel.contentView = hostingView
-        panel.setContentSize(
-            NSSize(
-                width: Self.mainPanelWidth,
-                height: min(
-                    max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight),
-                    Self.mainPanelMaximumHeight
-                )
-            )
+        let initialHeight = min(
+            max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight),
+            Self.mainPanelMaximumHeight
         )
+        let panel = MainPanel(
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: Self.mainPanelWidth,
+                height: initialHeight
+            ),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        panelReference = panel
+        panel.canBecomeKeyOverride = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.isMovableByWindowBackground = false
+        panel.level = .floating
+        panel.collectionBehavior = [.transient, .moveToActiveSpace]
+        panel.onCancel = { [weak self] in
+            self?.closeMainPanel(restoringFocus: true)
+        }
+        panel.contentView = hostingView
         return panel
     }
 

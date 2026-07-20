@@ -44,6 +44,7 @@ struct TaskListView: View {
         self.onOpenSettings = onOpenSettings
         self.onFocusInteraction = onFocusInteraction
         self.onHeightChanged = onHeightChanged
+        _showsOtherTasks = State(initialValue: !focusStore.isActive())
     }
 
     private var todayCompleted: [TaskItem] {
@@ -978,14 +979,20 @@ struct TaskListView: View {
                 focusPickerPresented = false
                 showsOtherTasks = true
             } else {
-                try focusStore.setSelection(
-                    ids,
-                    existingTaskIDs: Set(store.tasks.map(\.id)),
-                    completedTaskIDs: Set(store.historyTasks.map(\.id)),
-                    at: currentDate
-                )
+                let previousShowsOtherTasks = showsOtherTasks
                 if !wasActive {
                     showsOtherTasks = false
+                }
+                do {
+                    try focusStore.setSelection(
+                        ids,
+                        existingTaskIDs: Set(store.tasks.map(\.id)),
+                        completedTaskIDs: Set(store.historyTasks.map(\.id)),
+                        at: currentDate
+                    )
+                } catch {
+                    showsOtherTasks = previousShowsOtherTasks
+                    throw error
                 }
             }
             onFocusInteraction()
