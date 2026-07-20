@@ -8,9 +8,10 @@ APP_DELEGATE="$ROOT_DIR/MonoList/App/AppDelegate.swift"
 
 mkdir -p "$BUILD_DIR"
 
-if grep -A8 'scheduler.startPolling' "$APP_DELEGATE" |
-   grep -q 'isSettingsVisible'; then
-  echo "提醒到期不应因为设置窗口打开而延后。" >&2
+POLLING_BLOCK="$(grep -A10 'scheduler.startPolling' "$APP_DELEGATE")"
+if ! echo "$POLLING_BLOCK" | grep -q 'isSettingsVisible' ||
+   ! echo "$POLLING_BLOCK" | grep -q 'reminderPanelController.*isVisible'; then
+  echo "MonoList 主窗口、设置窗口或上一条提醒可见时，下一条提醒必须等待。" >&2
   exit 1
 fi
 

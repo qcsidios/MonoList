@@ -24,9 +24,14 @@ struct TaskListView: View {
     @State private var draftScrollRequest = UUID()
     @State private var taskRowHeights: [UUID: CGFloat] = [:]
     @State private var showsOtherTasks = true
+    @State private var rendersOtherTasks = true
+    @State private var otherTasksTransitionID = UUID()
     @State private var focusPickerPresented = false
     @State private var focusEditingText = ""
     @State private var focusEditorFocused = false
+    @State private var completingTaskIDs: Set<UUID> = []
+    @Namespace private var taskMovementNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         store: TaskStore,
@@ -44,19 +49,17 @@ struct TaskListView: View {
         self.onOpenSettings = onOpenSettings
         self.onFocusInteraction = onFocusInteraction
         self.onHeightChanged = onHeightChanged
-        _showsOtherTasks = State(initialValue: !focusStore.isActive())
+        let startsWithOtherTasks = !focusStore.isActive()
+        _showsOtherTasks = State(initialValue: startsWithOtherTasks)
+        _rendersOtherTasks = State(initialValue: startsWithOtherTasks)
     }
 
     private var todayCompleted: [TaskItem] {
-        store.completedTasks(on: currentDate).filter {
-            !activeFocusIDs.contains($0.id)
-        }
+        store.completedTasks(on: currentDate)
     }
 
     private var olderCompleted: [TaskItem] {
-        store.completedTasks(before: currentDate).filter {
-            !activeFocusIDs.contains($0.id)
-        }
+        store.completedTasks(before: currentDate)
     }
 
     private var visibleOlderCompleted: [TaskItem] {
@@ -163,21 +166,38 @@ struct TaskListView: View {
                 mainContent
             }
         }
-        .popover(isPresented: $focusPickerPresented, arrowEdge: .top) {
-            focusPicker
-        }
-        .frame(width: WindowCoordinator.mainPanelWidth, height: preferredHeight)
+        .animation(layoutAnimation, value: activeFocusIDs)
+        .animation(layoutAnimation, value: otherPendingTasks.map(\.id))
+        .animation(layoutAnimation, value: pendingFocusTasks.map(\.id))
+        .animation(layoutAnimation, value: todayCompleted.map(\.id))
+        .animation(layoutAnimation, value: showsOlderCompleted)
+        .animation(layoutAnimation, value: draftState.isPresented)
+        .frame(
+            minWidth: WindowCoordinator.mainPanelWidth,
+            idealWidth: WindowCoordinator.mainPanelWidth,
+            maxWidth: WindowCoordinator.mainPanelWidth,
+            minHeight: WindowCoordinator.mainPanelMinimumHeight,
+            idealHeight: preferredHeight,
+            maxHeight: .infinity,
+            alignment: .top
+        )
+        .animation(nil, value: preferredHeight)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .frame(maxHeight: .infinity, alignment: .top)
         .environment(\.colorScheme, .light)
         .onAppear {
             focusStore.reconcile(existingTaskIDs: Set(store.tasks.map(\.id)))
-            showsOtherTasks = !focusStore.isActive(at: currentDate)
+            setOtherTasksExpanded(
+                !focusStore.isActive(at: currentDate),
+                animated: false
+            )
             draftState.syncVisibility(hasPendingTasks: !store.pendingTasks.isEmpty)
             installKeyboardMonitor()
             onHeightChanged(preferredHeight)
         }
         .onDisappear {
+            otherTasksTransitionID = UUID()
             commitDraft()
             removeKeyboardMonitor()
         }
@@ -192,7 +212,7 @@ struct TaskListView: View {
         .onChange(of: store.tasks) { _, tasks in
             focusStore.reconcile(existingTaskIDs: Set(tasks.map(\.id)))
             if !focusStore.isActive(at: currentDate) {
-                showsOtherTasks = true
+                setOtherTasksExpanded(true, animated: false)
             }
         }
         .onReceive(
@@ -200,7 +220,7 @@ struct TaskListView: View {
         ) { date in
             currentDate = date
             if !focusStore.isActive(at: date) {
-                showsOtherTasks = true
+                setOtherTasksExpanded(true, animated: false)
             }
         }
         .alert(
@@ -242,29 +262,50 @@ struct TaskListView: View {
         VStack(spacing: 0) {
             standardListHeader
             Divider().opacity(0.45)
-            focusSection
+            ScrollViewReader { proxy in
+                ScrollView {
+                    scrollableTaskContent
+                }
+                .onChange(of: draftScrollRequest) { _, _ in
+                    DispatchQueue.main.async {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            proxy.scrollTo("task-draft-row", anchor: .bottom)
+                        }
+                        DispatchQueue.main.async { draftFocused = true }
+                    }
+                }
+            }
+            .scrollBounceBehavior(.always, axes: .vertical)
+            .scrollDisabled(false)
+        }
+    }
+
+    private var scrollableTaskContent: some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                focusSection
+                focusPickerAnchor
+            }
             if hasActiveFocus {
                 Divider().opacity(0.45)
                 otherTasksDisclosure
+                    .transition(.opacity)
             }
-            if !hasActiveFocus || showsOtherTasks {
+            if !hasActiveFocus || rendersOtherTasks {
                 Divider().opacity(0.35)
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        otherTaskContent
-                    }
-                    .onChange(of: draftScrollRequest) { _, _ in
-                        DispatchQueue.main.async {
-                            withAnimation(.easeOut(duration: 0.16)) {
-                                proxy.scrollTo("task-draft-row", anchor: .bottom)
-                            }
-                            DispatchQueue.main.async { draftFocused = true }
-                        }
-                    }
-                }
-                .scrollBounceBehavior(.always, axes: .vertical)
+                otherTaskContent
             }
         }
+    }
+
+    private var focusPickerAnchor: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .offset(x: -12, y: 20)
+            .popover(isPresented: $focusPickerPresented, arrowEdge: .trailing) {
+                focusPicker
+            }
+            .accessibilityHidden(true)
     }
 
     private var otherTaskContent: some View {
@@ -312,7 +353,7 @@ struct TaskListView: View {
 
             Button {
                 commitDraft()
-                showsOtherTasks = true
+                setOtherTasksExpanded(true, animated: false)
                 focusDraft(after: tasks(in: .shortTerm).last?.id)
             } label: {
                 HeaderIconLabel(systemName: "plus")
@@ -360,8 +401,10 @@ struct TaskListView: View {
     private var focusSection: some View {
         if hasActiveFocus {
             activeFocusSection
+                .transition(.opacity)
         } else {
             emptyFocusSection
+                .transition(.opacity)
         }
     }
 
@@ -443,16 +486,12 @@ struct TaskListView: View {
         VStack(spacing: 0) {
             if let currentFocusTask {
                 HStack(alignment: .center, spacing: 13) {
-                    Button {
-                        completeFocusTask(currentFocusTask)
-                    } label: {
-                        Image(systemName: "circle")
-                            .font(.system(size: 24, weight: .regular))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26, height: 26)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("完成当前任务")
+                    TaskCompletionButton(
+                        symbolSize: 24,
+                        frameSize: 26,
+                        isCompleting: completingTaskIDs.contains(currentFocusTask.id),
+                        action: { completeFocusTask(currentFocusTask) }
+                    )
                     VStack(alignment: .leading, spacing: 7) {
                         Text("当前")
                             .font(.system(size: 11, weight: .semibold))
@@ -470,6 +509,11 @@ struct TaskListView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 13)
                 .padding(.bottom, 19)
+                .matchedGeometryEffect(
+                    id: currentFocusTask.id,
+                    in: taskMovementNamespace
+                )
+                .transition(.opacity)
                 .contextMenu {
                     Button("删除", role: .destructive) {
                         deleteFocusTask(currentFocusTask)
@@ -499,22 +543,19 @@ struct TaskListView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 112)
+                .transition(.opacity)
             }
         }
     }
 
     private func focusFollowingRow(_ item: TaskItem) -> some View {
         return HStack(alignment: .center, spacing: 10) {
-            Button {
-                completeFocusTask(item)
-            } label: {
-                Image(systemName: "circle")
-                    .font(.system(size: 19))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("完成任务")
+            TaskCompletionButton(
+                symbolSize: 19,
+                frameSize: 24,
+                isCompleting: completingTaskIDs.contains(item.id),
+                action: { completeFocusTask(item) }
+            )
             focusEditableText(
                 for: item,
                 fontSize: 14,
@@ -527,6 +568,8 @@ struct TaskListView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 9)
         .frame(minHeight: 47)
+        .matchedGeometryEffect(id: item.id, in: taskMovementNamespace)
+        .transition(.opacity)
         .contentShape(Rectangle())
         .contextMenu {
             Button("删除", role: .destructive) {
@@ -565,6 +608,11 @@ struct TaskListView: View {
         } else {
             Text(item.text)
                 .font(.system(size: fontSize, weight: fontWeight))
+                .strikethrough(completingTaskIDs.contains(item.id))
+                .foregroundStyle(
+                    completingTaskIDs.contains(item.id) ? .secondary : .primary
+                )
+                .opacity(completingTaskIDs.contains(item.id) ? 0.66 : 1)
                 .lineLimit(lineLimit)
                 .lineSpacing(lineSpacing)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -580,9 +628,7 @@ struct TaskListView: View {
 
     private var otherTasksDisclosure: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.16)) {
-                showsOtherTasks.toggle()
-            }
+            setOtherTasksExpanded(!showsOtherTasks)
         } label: {
             HStack(spacing: 7) {
                 Text("其他待办")
@@ -595,6 +641,7 @@ struct TaskListView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(showsOtherTasks ? 90 : 0))
+                    .animation(feedbackAnimation, value: showsOtherTasks)
             }
             .padding(.horizontal, 17)
             .frame(height: 40)
@@ -602,6 +649,38 @@ struct TaskListView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(showsOtherTasks ? "收起其他待办" : "展开其他待办")
+    }
+
+    private func setOtherTasksExpanded(
+        _ expanded: Bool,
+        animated: Bool = true
+    ) {
+        let transitionID = UUID()
+        otherTasksTransitionID = transitionID
+
+        if expanded {
+            rendersOtherTasks = true
+            showsOtherTasks = true
+            return
+        }
+
+        showsOtherTasks = false
+        guard animated && !reduceMotion else {
+            rendersOtherTasks = false
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            guard otherTasksTransitionID == transitionID,
+                  !showsOtherTasks else {
+                return
+            }
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                rendersOtherTasks = false
+            }
+        }
     }
 
     private var focusPicker: some View {
@@ -650,6 +729,7 @@ struct TaskListView: View {
                 .frame(height: 34)
         }
         .frame(width: 286)
+        .animation(feedbackAnimation, value: activeFocusIDs)
     }
 
     private func focusPickerRow(_ item: TaskItem) -> some View {
@@ -763,25 +843,28 @@ struct TaskListView: View {
                     if activeFocusIDs.contains(item.id) { onFocusInteraction() }
                 },
                 onComplete: { text in
-                    performAction { try store.complete(id: item.id, finalText: text) }
+                    let completed = performAnimatedAction {
+                        try store.complete(id: item.id, finalText: text)
+                    }
                     if activeFocusIDs.contains(item.id) { onFocusInteraction() }
+                    return completed
                 },
                 onDelete: {
-                    performAction { try store.delete(id: item.id) }
+                    performAnimatedAction { try store.delete(id: item.id) }
                     if activeFocusIDs.contains(item.id) { onFocusInteraction() }
                     if selectedTaskID == item.id {
                         selectedTaskID = nil
                     }
                 },
-                onMoveUp: perform { try store.move(id: item.id, by: -1) },
-                onMoveDown: perform { try store.move(id: item.id, by: 1) },
+                onMoveUp: performAnimated { try store.move(id: item.id, by: -1) },
+                onMoveDown: performAnimated { try store.move(id: item.id, by: 1) },
                 onInsertAfter: {
                     focusDraft(after: item.id, in: item.group)
                 },
                 onUpdateReminder: perform { reminder in
                     try store.updateReminder(id: item.id, reminder: reminder)
                 },
-                onChangeGroup: perform {
+                onChangeGroup: performAnimated {
                     try store.move(
                         id: item.id,
                         to: item.group == .shortTerm ? .longTerm : .shortTerm,
@@ -795,6 +878,8 @@ struct TaskListView: View {
                     editingTaskID = editing ? item.id : nil
                 }
             )
+            .matchedGeometryEffect(id: item.id, in: taskMovementNamespace)
+            .transition(.opacity)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(
@@ -860,6 +945,7 @@ struct TaskListView: View {
     private func draftDropRow(group: TaskGroup, beforeID: UUID?) -> some View {
         draftRow
             .id("task-draft-row")
+            .transition(.opacity)
             .onDrop(
                 of: [UTType.text],
                 delegate: TaskGroupDropDelegate(
@@ -919,7 +1005,9 @@ struct TaskListView: View {
                 Spacer()
                 Button(showsOlderCompleted ? "隐藏" : "显示") {
                     commitDraft()
-                    showsOlderCompleted.toggle()
+                    withAnimation(layoutAnimation) {
+                        showsOlderCompleted.toggle()
+                    }
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .medium))
@@ -954,19 +1042,20 @@ struct TaskListView: View {
         CompletedTaskRow(
             item: item,
             onRestore: {
-                performAction { try store.restore(id: item.id) }
+                performAnimatedAction { try store.restore(id: item.id) }
                 if activeFocusIDs.contains(item.id) { onFocusInteraction() }
             },
             onDelete: {
-                performAction { try store.delete(id: item.id) }
+                performAnimatedAction { try store.delete(id: item.id) }
                 if activeFocusIDs.contains(item.id) { onFocusInteraction() }
             }
         )
+        .matchedGeometryEffect(id: item.id, in: taskMovementNamespace)
+        .transition(.opacity)
     }
 
     private func toggleFocusMembership(_ item: TaskItem) {
         var ids = activeFocusIDs
-        let wasActive = hasActiveFocus
         if let index = ids.firstIndex(of: item.id) {
             ids.remove(at: index)
         } else {
@@ -977,23 +1066,14 @@ struct TaskListView: View {
             if ids.isEmpty {
                 try focusStore.clearSelection()
                 focusPickerPresented = false
-                showsOtherTasks = true
+                setOtherTasksExpanded(true, animated: false)
             } else {
-                let previousShowsOtherTasks = showsOtherTasks
-                if !wasActive {
-                    showsOtherTasks = false
-                }
-                do {
-                    try focusStore.setSelection(
-                        ids,
-                        existingTaskIDs: Set(store.tasks.map(\.id)),
-                        completedTaskIDs: Set(store.historyTasks.map(\.id)),
-                        at: currentDate
-                    )
-                } catch {
-                    showsOtherTasks = previousShowsOtherTasks
-                    throw error
-                }
+                try focusStore.setSelection(
+                    ids,
+                    existingTaskIDs: Set(store.tasks.map(\.id)),
+                    completedTaskIDs: Set(store.historyTasks.map(\.id)),
+                    at: currentDate
+                )
             }
             onFocusInteraction()
         } catch {
@@ -1009,7 +1089,7 @@ struct TaskListView: View {
             focusEditorFocused = false
             focusEditingText = ""
             editingTaskID = nil
-            showsOtherTasks = true
+            setOtherTasksExpanded(true, animated: false)
             onFocusInteraction()
         } catch {
             errorMessage = error.localizedDescription
@@ -1017,11 +1097,19 @@ struct TaskListView: View {
     }
 
     private func completeFocusTask(_ item: TaskItem) {
+        guard !completingTaskIDs.contains(item.id) else { return }
         if editingTaskID == item.id {
             finishFocusEditing(item)
         }
-        performAction { try store.complete(id: item.id) }
-        onFocusInteraction()
+        withAnimation(feedbackAnimation) {
+            _ = completingTaskIDs.insert(item.id)
+        }
+        let delay = reduceMotion ? 0 : 0.24
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            performAnimatedAction { try store.complete(id: item.id) }
+            completingTaskIDs.remove(item.id)
+            onFocusInteraction()
+        }
     }
 
     private func beginFocusEditing(_ item: TaskItem) {
@@ -1060,7 +1148,7 @@ struct TaskListView: View {
         if editingTaskID == item.id {
             finishFocusEditing(item)
         }
-        performAction { try store.delete(id: item.id) }
+        performAnimatedAction { try store.delete(id: item.id) }
         onFocusInteraction()
     }
 
@@ -1207,7 +1295,7 @@ struct TaskListView: View {
                 return event
             }
             if event.keyCode == 51 || event.keyCode == 117 {
-                performAction { try store.delete(id: selectedTaskID) }
+                self.performAnimatedAction { try self.store.delete(id: selectedTaskID) }
                 self.selectedTaskID = nil
                 return nil
             }
@@ -1224,7 +1312,7 @@ struct TaskListView: View {
 
     private func performClear() {
         guard let clearAction else { return }
-        performAction {
+        performAnimatedAction {
             switch clearAction {
             case .pending:
                 try store.clearPending()
@@ -1246,6 +1334,27 @@ struct TaskListView: View {
         }
     }
 
+    @discardableResult
+    private func performAnimatedAction(_ action: () throws -> Void) -> Bool {
+        do {
+            try withAnimation(layoutAnimation) {
+                try action()
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    private var feedbackAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.16)
+    }
+
+    private var layoutAnimation: Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.22)
+    }
+
     private func perform(_ action: @escaping () throws -> Void) -> () -> Void {
         { performAction(action) }
     }
@@ -1255,9 +1364,17 @@ struct TaskListView: View {
     ) -> (Value) -> Void {
         { value in performAction { try action(value) } }
     }
+
+    private func performAnimated(
+        _ action: @escaping () throws -> Void
+    ) -> () -> Void {
+        { _ = performAnimatedAction(action) }
+    }
 }
 
 private struct FocusInlineButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
@@ -1269,6 +1386,10 @@ private struct FocusInlineButtonStyle: ButtonStyle {
                 in: RoundedRectangle(cornerRadius: 7)
             )
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.08),
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -1343,11 +1464,16 @@ private final class DraggingNSView: NSView {
 }
 
 private struct HeaderIconButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.78 : 1)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.08),
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -1362,6 +1488,7 @@ private struct CompletedTaskRow: View {
     let onDelete: () -> Void
 
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(alignment: .center, spacing: 9) {
@@ -1382,6 +1509,10 @@ private struct CompletedTaskRow: View {
                     .foregroundStyle(.tertiary)
                     .frame(width: 28, height: 28)
                     .opacity(isHovered ? 1 : 0)
+                    .animation(
+                        reduceMotion ? nil : .easeOut(duration: 0.16),
+                        value: isHovered
+                    )
             }
             .buttonStyle(.plain)
         }

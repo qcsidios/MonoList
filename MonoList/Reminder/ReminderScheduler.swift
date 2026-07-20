@@ -129,25 +129,31 @@ final class ReminderScheduler: ObservableObject {
     }
 
     func evaluate(interfaceBusy: Bool) {
-        if enabled,
-           let dedicatedTask = Self.dueDedicatedReminderTask(
+        let evaluationDate = wallClock()
+        if !interfaceBusy,
+           let dedicatedTask = Self.dueDedicatedReminderTasks(
                in: pendingTasks,
-               at: wallClock(),
+               at: evaluationDate,
                calendar: calendar
-           ) {
+           ).first(where: { task in
+               let key = Self.dedicatedReminderDispatchKey(
+                   for: task,
+                   at: evaluationDate,
+                   calendar: calendar
+               )
+               return !dispatchedDedicatedReminderKeys.contains(key)
+           }) {
             let key = Self.dedicatedReminderDispatchKey(
                 for: dedicatedTask,
-                at: wallClock(),
+                at: evaluationDate,
                 calendar: calendar
             )
-            if !dispatchedDedicatedReminderKeys.contains(key) {
-                dispatchedDedicatedReminderKeys.insert(key)
-                onDedicatedReminderDue(dedicatedTask.id)
-                if pendingCount > 0 {
-                    restart()
-                }
-                return
+            dispatchedDedicatedReminderKeys.insert(key)
+            onDedicatedReminderDue(dedicatedTask.id)
+            if enabled && pendingCount > 0 {
+                restart()
             }
+            return
         }
 
         guard let deadline, now() >= deadline else {
@@ -248,6 +254,14 @@ final class ReminderScheduler: ObservableObject {
         at date: Date,
         calendar: Calendar = .current
     ) -> TaskItem? {
+        dueDedicatedReminderTasks(in: tasks, at: date, calendar: calendar).first
+    }
+
+    static func dueDedicatedReminderTasks(
+        in tasks: [TaskItem],
+        at date: Date,
+        calendar: Calendar = .current
+    ) -> [TaskItem] {
         tasks
             .filter { $0.status == .pending }
             .compactMap { task -> (TaskItem, Date)? in
@@ -266,8 +280,20 @@ final class ReminderScheduler: ObservableObject {
                 }
                 return $0.0.order < $1.0.order
             }
-            .first?
-            .0
+            .map(\.0)
+    }
+
+    static func lightReminderTasks(
+        in tasks: [TaskItem],
+        focusTaskIDs: [UUID]?
+    ) -> [TaskItem] {
+        let pendingTasks = tasks.filter { $0.status == .pending }
+        guard let focusTaskIDs else { return pendingTasks }
+        let tasksByID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
+        let currentTask = focusTaskIDs
+            .compactMap { tasksByID[$0] }
+            .first { $0.status == .pending }
+        return currentTask.map { [$0] } ?? []
     }
 
     static func dedicatedReminderDate(

@@ -7,6 +7,7 @@ final class ReminderPanelController: ObservableObject {
     static let displayDurationSeconds: TimeInterval = 6
 
     @Published private(set) var isTesting = false
+    private(set) var isDedicatedReminder = false
 
     private var panel: NSPanel?
     private var countdownTimer: Timer?
@@ -61,6 +62,24 @@ final class ReminderPanelController: ObservableObject {
         ]
     }
 
+    static func tasksForFocusTest(
+        _ tasks: [TaskItem],
+        at date: Date = Date()
+    ) -> [TaskItem] {
+        guard tasks.isEmpty else { return tasks }
+        return [
+            TaskItem(
+                id: UUID(),
+                text: "这是一次专注提醒测试",
+                status: .pending,
+                order: 0,
+                createdAt: date,
+                updatedAt: date,
+                completedAt: nil
+            )
+        ]
+    }
+
     func show(
         tasks: [TaskItem],
         position: ReminderPosition,
@@ -68,6 +87,7 @@ final class ReminderPanelController: ObservableObject {
         title: String = "待办提醒",
         statusText: String? = nil,
         isFocusReminder: Bool = false,
+        isDedicatedReminder: Bool = false,
         testing: Bool = false,
         playsSound: Bool = true,
         soundName: String = "Glass",
@@ -136,6 +156,7 @@ final class ReminderPanelController: ObservableObject {
         self.onClose = onClose
         self.finalFrame = frame
         isTesting = testing
+        self.isDedicatedReminder = isDedicatedReminder
         isClosing = false
         remainingTenths = Int(Self.displayDurationSeconds * 10)
         if playsSound {
@@ -161,6 +182,7 @@ final class ReminderPanelController: ObservableObject {
     func close(animated: Bool = true, notifying: Bool = true) {
         guard let panel else {
             isTesting = false
+            isDedicatedReminder = false
             if notifying {
                 let callback = onClose
                 onClose = nil
@@ -177,6 +199,7 @@ final class ReminderPanelController: ObservableObject {
         countdownTimer?.invalidate()
         countdownTimer = nil
         isTesting = false
+        isDedicatedReminder = false
 
         guard animated, let finalFrame else {
             finishClosing(panel: panel, notifying: notifying)

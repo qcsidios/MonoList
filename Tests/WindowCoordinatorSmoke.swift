@@ -66,6 +66,13 @@ struct WindowCoordinatorSmoke {
         )
         precondition(halfwayFrame.height == 220)
         precondition(halfwayFrame.maxY == originalFrame.maxY)
+        let mismatchedEndFrame = NSRect(x: 120, y: 100, width: 336, height: 260)
+        let anchoredHalfwayFrame = WindowCoordinator.interpolatedMainPanelFrame(
+            from: originalFrame,
+            to: mismatchedEndFrame,
+            progress: 0.5
+        )
+        precondition(anchoredHalfwayFrame.maxY == originalFrame.maxY)
         var changingFrame = originalFrame
         for height: CGFloat in [216, 263, 341, 447, 341, 216] {
             changingFrame = WindowCoordinator.mainPanelFrame(
@@ -138,6 +145,33 @@ struct WindowCoordinatorSmoke {
                 dateHeaderCount: 0
             ) > WindowCoordinator.mainPanelMaximumHeight
         )
+        precondition(
+            SettingsView.nextReminderStatusText(
+                enabled: true,
+                hasActiveFocus: true,
+                lightReminderTaskCount: 0,
+                nextReminderDate: nil,
+                relativeTo: focusNow
+            ) == "今日专注已完成"
+        )
+        precondition(
+            SettingsView.nextReminderStatusText(
+                enabled: true,
+                hasActiveFocus: false,
+                lightReminderTaskCount: 0,
+                nextReminderDate: nil,
+                relativeTo: focusNow
+            ) == "暂无待办"
+        )
+        precondition(
+            SettingsView.nextReminderStatusText(
+                enabled: false,
+                hasActiveFocus: true,
+                lightReminderTaskCount: 1,
+                nextReminderDate: focusNow,
+                relativeTo: focusNow
+            ) == "未启用"
+        )
         let panelWindow = NSPanel()
         let settingsWindow = NSWindow()
         precondition(
@@ -205,9 +239,44 @@ struct WindowCoordinatorSmoke {
         precondition(taskListSource.contains(".easeOut(duration: 0.16)"))
         precondition(
             taskListSource.contains(
-                "_showsOtherTasks = State(initialValue: !focusStore.isActive())"
+                "let startsWithOtherTasks = !focusStore.isActive()"
+            ) && taskListSource.contains(
+                "_showsOtherTasks = State(initialValue: startsWithOtherTasks)"
+            ) && taskListSource.contains(
+                "_rendersOtherTasks = State(initialValue: startsWithOtherTasks)"
             )
         )
+        precondition(
+            taskListSource.contains(".animation(nil, value: preferredHeight)")
+        )
+        precondition(
+            !taskListSource.contains(
+                ".animation(layoutAnimation, value: showsOtherTasks)"
+            ),
+            "其他待办不能再次驱动整个 SwiftUI 布局动画"
+        )
+        precondition(
+            taskListSource.contains("idealHeight: preferredHeight") &&
+                taskListSource.contains("rendersOtherTasks"),
+            "窗口内容必须跟随当前视口，并在收起结束后再移除其他待办"
+        )
+        precondition(
+            !taskListSource.contains(
+                "store.completedTasks(on: currentDate).filter"
+            ),
+            "今日完成的专注任务不能从已完成列表中过滤"
+        )
+        precondition(
+            !taskListSource.contains(
+                "store.completedTasks(before: currentDate).filter"
+            ),
+            "历史专注任务不能从已完成列表中过滤"
+        )
+        precondition(taskListSource.contains("focusPickerAnchor"))
+        precondition(taskListSource.contains("arrowEdge: .trailing"))
+        precondition(taskListSource.contains("matchedGeometryEffect"))
+        precondition(taskListSource.contains("scrollDisabled(false)"))
+        precondition(taskListSource.contains("private var scrollableTaskContent"))
         let windowCoordinatorSource = try String(
             contentsOfFile: "MonoList/App/WindowCoordinator.swift",
             encoding: .utf8
@@ -228,6 +297,8 @@ struct WindowCoordinatorSmoke {
             taskRowSource.contains(".fixedSize(horizontal: false, vertical: true)"),
             "带提醒的多行任务正文不能被面板高度压缩"
         )
+        precondition(taskRowSource.contains("struct TaskCompletionButton"))
+        precondition(taskRowSource.contains("let delay = reduceMotion ? 0 : 0.24"))
         let headerIconStart = taskListSource.range(
             of: "private struct HeaderIconLabel"
         )
@@ -324,6 +395,13 @@ struct WindowCoordinatorSmoke {
         }) else {
             throw CocoaError(.coderInvalidValue)
         }
+        guard let displayedHostingView = displayedMainWindow.contentView as? NSHostingView<TaskListView> else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        precondition(
+            displayedHostingView.sizingOptions.isEmpty,
+            "主窗口显示后必须由 AppKit 外框单独控制高度"
+        )
         precondition(abs(displayedMainWindow.frame.maxY - testAnchor.y) < 0.5)
         for index in 0..<5 {
             try store.add(text: "动态高度测试 \(index)")
@@ -335,6 +413,161 @@ struct WindowCoordinatorSmoke {
         }
         coordinator.closeMainPanel(animated: false)
         precondition(!coordinator.isMainPanelVisible)
+
+        let focusDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MonoListFocusWindowTests-\(UUID().uuidString)")
+        let focusTaskStore = TaskStore(
+            fileURL: focusDirectory.appendingPathComponent("tasks.json")
+        )
+        let focusWindowStore = FocusStore(
+            fileURL: focusDirectory.appendingPathComponent("focus.json")
+        )
+        var focusWindowTasks: [TaskItem] = []
+        for index in 0..<7 {
+            focusWindowTasks.append(
+                try focusTaskStore.add(text: "专注窗口动态测试 \(index)")
+            )
+        }
+        try focusWindowStore.setSelection(
+            [focusWindowTasks[0].id],
+            existingTaskIDs: Set(focusWindowTasks.map(\.id)),
+            completedTaskIDs: [],
+            at: Date()
+        )
+        let focusCoordinator = WindowCoordinator(
+            taskStore: focusTaskStore,
+            focusStore: focusWindowStore
+        )
+        let windowsBeforeFocusPanel = Set(NSApp.windows.map(ObjectIdentifier.init))
+        let focusAnchor = NSPoint(x: 700, y: 800)
+        focusCoordinator.showMainPanel(at: focusAnchor)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        guard let focusMainWindow = NSApp.windows.first(where: {
+            !windowsBeforeFocusPanel.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        let collapsedHeight = focusMainWindow.frame.height
+        precondition(abs(focusMainWindow.frame.maxY - focusAnchor.y) < 0.5)
+        click(window: focusMainWindow, at: NSPoint(x: 150, y: 20))
+        var previousHeight = focusMainWindow.frame.height
+        let disclosureDeadline = Date().addingTimeInterval(0.4)
+        while Date() < disclosureDeadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            let frame = focusMainWindow.frame
+            precondition(abs(frame.maxY - focusAnchor.y) < 0.5)
+            precondition(frame.height + 0.5 >= previousHeight)
+            previousHeight = frame.height
+        }
+        precondition(focusMainWindow.frame.height > collapsedHeight + 20)
+        let expandedScrollViews = scrollViews(in: focusMainWindow.contentView)
+        precondition(expandedScrollViews.contains { scrollView in
+            guard let documentView = scrollView.documentView else { return false }
+            return documentView.frame.height > scrollView.contentView.bounds.height + 1
+        })
+        click(
+            window: focusMainWindow,
+            at: NSPoint(
+                x: 150,
+                y: focusMainWindow.frame.height - collapsedHeight + 20
+            )
+        )
+        previousHeight = focusMainWindow.frame.height
+        let collapseDeadline = Date().addingTimeInterval(0.4)
+        while Date() < collapseDeadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            let frame = focusMainWindow.frame
+            precondition(abs(frame.maxY - focusAnchor.y) < 0.5)
+            precondition(frame.height <= previousHeight + 0.5)
+            previousHeight = frame.height
+        }
+        precondition(focusMainWindow.frame.height <= collapsedHeight + 1)
+        focusCoordinator.closeMainPanel(animated: false)
+
+        let pickerDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MonoListFocusPickerTests-\(UUID().uuidString)")
+        let pickerTaskStore = TaskStore(
+            fileURL: pickerDirectory.appendingPathComponent("tasks.json")
+        )
+        let pickerFocusStore = FocusStore(
+            fileURL: pickerDirectory.appendingPathComponent("focus.json")
+        )
+        for index in 0..<7 {
+            try pickerTaskStore.add(text: "专注选择浮窗测试 \(index)")
+        }
+        let pickerCoordinator = WindowCoordinator(
+            taskStore: pickerTaskStore,
+            focusStore: pickerFocusStore
+        )
+        let windowsBeforePickerPanel = Set(NSApp.windows.map(ObjectIdentifier.init))
+        pickerCoordinator.showMainPanel(at: focusAnchor)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        guard let pickerMainWindow = NSApp.windows.first(where: {
+            !windowsBeforePickerPanel.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        let expandedHeight = pickerMainWindow.frame.height
+        let visibleWindowsBeforePopover = Set(
+            NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init)
+        )
+        click(
+            window: pickerMainWindow,
+            at: NSPoint(x: 150, y: expandedHeight - 84)
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        guard let focusPickerWindow = NSApp.windows.first(where: {
+            !visibleWindowsBeforePopover.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        precondition(
+            focusPickerWindow.frame.minX >= pickerMainWindow.frame.maxX - 4,
+            "主窗口 \(pickerMainWindow.frame)，浮窗 \(focusPickerWindow.frame)"
+        )
+        click(
+            window: focusPickerWindow,
+            at: NSPoint(x: 120, y: focusPickerWindow.frame.height - 62)
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.35))
+        precondition(pickerFocusStore.taskIDs().count == 1)
+        precondition(abs(pickerMainWindow.frame.maxY - focusAnchor.y) < 0.5)
+        precondition(pickerMainWindow.frame.height >= expandedHeight - 1)
+        pickerCoordinator.closeMainPanel(animated: false)
+
+        let completionDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MonoListCompletionMotionTests-\(UUID().uuidString)")
+        let completionStore = TaskStore(
+            fileURL: completionDirectory.appendingPathComponent("tasks.json")
+        )
+        let completionFocusStore = FocusStore(
+            fileURL: completionDirectory.appendingPathComponent("focus.json")
+        )
+        for index in 0..<3 {
+            try completionStore.add(text: "完成动效测试 \(index)")
+        }
+        let completionCoordinator = WindowCoordinator(
+            taskStore: completionStore,
+            focusStore: completionFocusStore
+        )
+        let windowsBeforeCompletionPanel = Set(NSApp.windows.map(ObjectIdentifier.init))
+        completionCoordinator.showMainPanel(at: focusAnchor)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        guard let completionMainWindow = NSApp.windows.first(where: {
+            !windowsBeforeCompletionPanel.contains(ObjectIdentifier($0)) && $0.isVisible
+        }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        click(
+            window: completionMainWindow,
+            at: NSPoint(x: 29, y: completionMainWindow.frame.height - 170)
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        precondition(completionStore.pendingTasks.count == 3)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        precondition(completionStore.pendingTasks.count == 2)
+        precondition(completionStore.historyTasks.count == 1)
+        completionCoordinator.closeMainPanel(animated: false)
 
         print("Window coordinator smoke passed.")
     }
@@ -391,6 +624,31 @@ struct WindowCoordinatorSmoke {
             isARepeat: false,
             keyCode: keyCode
         )!
+    }
+
+    private static func click(window: NSWindow, at point: NSPoint) {
+        for eventType in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            guard let event = NSEvent.mouseEvent(
+                with: eventType,
+                location: point,
+                modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber,
+                context: nil,
+                eventNumber: 0,
+                clickCount: 1,
+                pressure: eventType == .leftMouseDown ? 1 : 0
+            ) else {
+                preconditionFailure("无法创建窗口点击事件")
+            }
+            window.sendEvent(event)
+        }
+    }
+
+    private static func scrollViews(in view: NSView?) -> [NSScrollView] {
+        guard let view else { return [] }
+        return (view as? NSScrollView).map { [$0] } ??
+            view.subviews.flatMap { scrollViews(in: $0) }
     }
 }
 

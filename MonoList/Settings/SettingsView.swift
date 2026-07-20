@@ -7,6 +7,7 @@ struct SettingsView: View {
 
     @ObservedObject var settings: AppSettings
     @ObservedObject var taskStore: TaskStore
+    @ObservedObject var focusStore: FocusStore
     @ObservedObject var reminderScheduler: ReminderScheduler
     @ObservedObject var loginItemController: LoginItemController
     @ObservedObject var updater: AppUpdater
@@ -262,19 +263,29 @@ struct SettingsView: View {
     }
 
     private var nextReminderText: String {
-        guard settings.reminderEnabled else { return "未启用" }
-        guard !taskStore.pendingTasks.isEmpty else { return "暂无待办" }
-        guard let date = reminderScheduler.nextReminderDate else {
-            return "等待调度"
-        }
-        return Self.nextReminderTitle(for: date, relativeTo: currentDate)
+        Self.nextReminderStatusText(
+            enabled: settings.reminderEnabled,
+            hasActiveFocus: focusStore.isActive(at: currentDate),
+            lightReminderTaskCount: lightReminderTasks.count,
+            nextReminderDate: reminderScheduler.nextReminderDate,
+            relativeTo: currentDate
+        )
     }
 
     private var nextReminderColor: Color {
-        if settings.reminderEnabled && !taskStore.pendingTasks.isEmpty {
+        if settings.reminderEnabled && !lightReminderTasks.isEmpty {
             return .primary
         }
         return .secondary
+    }
+
+    private var lightReminderTasks: [TaskItem] {
+        ReminderScheduler.lightReminderTasks(
+            in: taskStore.tasks,
+            focusTaskIDs: focusStore.isActive(at: currentDate)
+                ? focusStore.taskIDs(at: currentDate)
+                : nil
+        )
     }
 
     private var updateStatusColor: Color {
@@ -351,6 +362,27 @@ struct SettingsView: View {
         }
         let day = date.formatted(.dateTime.month().day())
         return "\(day) \(time)"
+    }
+
+    static func nextReminderStatusText(
+        enabled: Bool,
+        hasActiveFocus: Bool,
+        lightReminderTaskCount: Int,
+        nextReminderDate: Date?,
+        relativeTo referenceDate: Date,
+        calendar: Calendar = .current
+    ) -> String {
+        guard enabled else { return "未启用" }
+        if hasActiveFocus && lightReminderTaskCount == 0 {
+            return "今日专注已完成"
+        }
+        guard lightReminderTaskCount > 0 else { return "暂无待办" }
+        guard let nextReminderDate else { return "等待调度" }
+        return nextReminderTitle(
+            for: nextReminderDate,
+            relativeTo: referenceDate,
+            calendar: calendar
+        )
     }
 }
 

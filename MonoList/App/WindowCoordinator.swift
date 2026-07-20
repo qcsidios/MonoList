@@ -108,11 +108,12 @@ final class WindowCoordinator {
         func interpolate(_ start: CGFloat, _ end: CGFloat) -> CGFloat {
             start + (end - start) * value
         }
+        let height = interpolate(start.height, end.height)
         return NSRect(
             x: interpolate(start.minX, end.minX),
-            y: interpolate(start.minY, end.minY),
+            y: start.maxY - height,
             width: interpolate(start.width, end.width),
-            height: interpolate(start.height, end.height)
+            height: height
         )
     }
 
@@ -327,6 +328,7 @@ final class WindowCoordinator {
             rootView: SettingsView(
                 settings: settings,
                 taskStore: taskStore,
+                focusStore: focusStore,
                 reminderScheduler: reminderScheduler,
                 loginItemController: loginItemController,
                 updater: updater,
@@ -373,6 +375,7 @@ final class WindowCoordinator {
             max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight),
             Self.mainPanelMaximumHeight
         )
+        hostingView.sizingOptions = []
         let panel = MainPanel(
             contentRect: NSRect(
                 x: 0,
@@ -423,6 +426,10 @@ final class WindowCoordinator {
             keepingTopOf: currentFrame,
             height: height
         )
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.setFrame(targetFrame, display: true)
+            return
+        }
         let duration = 0.22
         let startTime = ProcessInfo.processInfo.systemUptime
         let timer = Timer(timeInterval: 1 / 60, repeats: true) {

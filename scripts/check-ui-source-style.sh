@@ -186,14 +186,74 @@ for contract in \
   fi
 done
 
-if ! grep -q 'showsOtherTasks = false' "$TASK_LIST" ||
-   ! grep -q 'focusPickerPresented = false' "$TASK_LIST" ||
+if ! grep -q 'focusPickerPresented = false' "$TASK_LIST" ||
    ! grep -q 'try focusStore.clearSelection()' "$TASK_LIST"; then
   echo "专注任务必须即时生效，并能在同一窗口清空。" >&2
   exit 1
 fi
 
-if ! grep -q '_showsOtherTasks = State(initialValue: !focusStore.isActive())' "$TASK_LIST"; then
+FOCUS_TOGGLE_BLOCK="$(awk '
+  /private func toggleFocusMembership/ { capture = 1 }
+  /private func clearFocusSelection/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+if echo "$FOCUS_TOGGLE_BLOCK" | grep -q 'showsOtherTasks = false'; then
+  echo "添加今日专注任务必须保留其他待办当前展开状态。" >&2
+  exit 1
+fi
+
+if ! grep -q 'focusPickerAnchor' "$TASK_LIST" ||
+   ! grep -q 'arrowEdge: .trailing' "$TASK_LIST"; then
+  echo "今日专注选择浮窗必须锚定在专注组件右侧。" >&2
+  exit 1
+fi
+
+if ! grep -q 'matchedGeometryEffect' "$TASK_LIST" ||
+   ! grep -q 'TaskCompletionButton' "$TASK_LIST" ||
+   ! grep -q 'scrollDisabled(false)' "$TASK_LIST"; then
+  echo "专注迁移、完成反馈和其他待办滚动必须保留明确过渡。" >&2
+  exit 1
+fi
+
+SCROLLABLE_TASK_BLOCK="$(awk '
+  /private var scrollableTaskContent/ { capture = 1 }
+  /private var focusPickerAnchor/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+for contract in 'focusSection' 'otherTasksDisclosure' 'otherTaskContent'; do
+  if ! echo "$SCROLLABLE_TASK_BLOCK" | grep -q "$contract"; then
+    echo "标题栏以下所有任务必须共用一个滚动容器：$contract" >&2
+    exit 1
+  fi
+done
+
+MAIN_LIST_BLOCK="$(awk '
+  /private var mainList/ { capture = 1 }
+  /private var scrollableTaskContent/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+if ! echo "$MAIN_LIST_BLOCK" | grep -q 'ScrollView' ||
+   ! echo "$MAIN_LIST_BLOCK" | grep -q 'scrollableTaskContent'; then
+  echo "主窗口必须固定标题栏，并让完整任务区作为一个整体滚动。" >&2
+  exit 1
+fi
+
+if ! grep -q '.animation(nil, value: preferredHeight)' "$TASK_LIST" ||
+   ! grep -q '.frame(maxHeight: .infinity, alignment: .top)' "$TASK_LIST"; then
+  echo "SwiftUI 内容必须顶部对齐，且不能与 AppKit 同时动画窗口高度。" >&2
+  exit 1
+fi
+
+if grep -Fq '.animation(layoutAnimation, value: showsOtherTasks)' "$TASK_LIST" ||
+   ! grep -Fq 'idealHeight: preferredHeight' "$TASK_LIST" ||
+   ! grep -Fq 'rendersOtherTasks' "$TASK_LIST"; then
+  echo "其他待办只能随窗口下边缘揭示或裁切，不能让 SwiftUI 根视图提前跳到目标布局。" >&2
+  exit 1
+fi
+
+if ! grep -Fq 'let startsWithOtherTasks = !focusStore.isActive()' "$TASK_LIST" ||
+   ! grep -Fq '_showsOtherTasks = State(initialValue: startsWithOtherTasks)' "$TASK_LIST" ||
+   ! grep -Fq '_rendersOtherTasks = State(initialValue: startsWithOtherTasks)' "$TASK_LIST"; then
   echo "主窗口首次渲染必须直接使用当前专注状态，不能展开后再收起。" >&2
   exit 1
 fi
@@ -207,6 +267,17 @@ fi
 if ! grep -q 'weak var panelReference: MainPanel?' "$WINDOW_COORDINATOR" ||
    ! grep -q 'max(hostingView.fittingSize.height, Self.mainPanelMinimumHeight)' "$WINDOW_COORDINATOR"; then
   echo "主窗口显示前必须以真实内容高度完成唯一一次初始定高。" >&2
+  exit 1
+fi
+
+if ! grep -Fq 'hostingView.sizingOptions = []' "$WINDOW_COORDINATOR"; then
+  echo "主窗口显示后必须关闭 SwiftUI 固有尺寸驱动，只允许 AppKit 改变窗口高度。" >&2
+  exit 1
+fi
+
+if grep -q 'store.completedTasks(on: currentDate).filter' "$TASK_LIST" ||
+   grep -q 'store.completedTasks(before: currentDate).filter' "$TASK_LIST"; then
+  echo "专注任务完成后必须立即显示在已完成列表，不能等待清空专注。" >&2
   exit 1
 fi
 

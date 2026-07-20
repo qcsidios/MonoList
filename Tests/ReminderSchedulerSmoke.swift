@@ -123,6 +123,11 @@ struct ReminderSchedulerSmoke {
         wallClock = fixedDate(hour: 18, minute: 0, calendar: calendar)
         now += 60
         scheduler.evaluate(interfaceBusy: true)
+        precondition(
+            dedicatedReminderIDs.isEmpty,
+            "MonoList 界面繁忙时，单条定时提醒应等待而不是覆盖当前界面"
+        )
+        scheduler.evaluate(interfaceBusy: false)
         precondition(dedicatedReminderIDs == [dedicatedID])
         precondition(
             scheduler.deadline != globalDeadlineBeforeDedicatedReminder,
@@ -140,8 +145,86 @@ struct ReminderSchedulerSmoke {
         let testTasks = ReminderPanelController.tasksForTest([])
         precondition(testTasks.count == 1)
         precondition(testTasks[0].text == "这是一次轻提醒测试")
+        let focusTestTasks = ReminderPanelController.tasksForFocusTest([])
+        precondition(focusTestTasks.count == 1)
+        precondition(focusTestTasks[0].text == "这是一次专注提醒测试")
         precondition(ReminderPanelController.resolvedSoundName("不存在的声音") == "Glass")
         precondition(ReminderPanelController.displayDurationSeconds == 6)
+
+        let queuedIDs = [
+            UUID(uuidString: "00000000-0000-0000-0000-000000000211")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000212")!,
+        ]
+        let queuedTasks = queuedIDs.enumerated().map { index, id in
+            TaskItem(
+                id: id,
+                text: "同时到期提醒 \(index + 1)",
+                status: .pending,
+                order: index,
+                createdAt: fixedDate(hour: 9, minute: 0, calendar: calendar),
+                updatedAt: fixedDate(hour: 9, minute: 0, calendar: calendar),
+                completedAt: nil,
+                reminder: .once(at: fixedDate(hour: 18, minute: 0, calendar: calendar))
+            )
+        }
+        var queuedDispatches: [UUID] = []
+        let queuedScheduler = ReminderScheduler(
+            now: { 40_000 },
+            wallClock: { fixedDate(hour: 18, minute: 0, calendar: calendar) },
+            calendar: calendar,
+            onDue: {},
+            onDedicatedReminderDue: { queuedDispatches.append($0) }
+        )
+        queuedScheduler.configure(
+            enabled: false,
+            intervalMinutes: 60,
+            pendingTasks: queuedTasks
+        )
+        queuedScheduler.evaluate(interfaceBusy: false)
+        precondition(
+            queuedDispatches == [queuedIDs[0]],
+            "关闭轻提醒后，单条定时提醒仍应独立触发"
+        )
+        queuedScheduler.evaluate(interfaceBusy: true)
+        precondition(
+            queuedDispatches == [queuedIDs[0]],
+            "上一条提醒显示期间不能被下一条覆盖"
+        )
+        queuedScheduler.evaluate(interfaceBusy: false)
+        precondition(
+            queuedDispatches == queuedIDs,
+            "多条同时到期提醒应按任务顺序逐条展示"
+        )
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: queuedTasks,
+                focusTaskIDs: nil
+            ).map(\.id) == queuedIDs,
+            "没有今日专注时，轻提醒应使用全部未完成任务"
+        )
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: queuedTasks,
+                focusTaskIDs: [queuedIDs[1]]
+            ).map(\.id) == [queuedIDs[1]],
+            "设置今日专注后，轻提醒只能使用当前专注任务"
+        )
+        let completedFocusTask = TaskItem(
+            id: UUID(),
+            text: "已经完成的专注任务",
+            status: .history,
+            order: 0,
+            createdAt: wallClock,
+            updatedAt: wallClock,
+            completedAt: wallClock
+        )
+        precondition(
+            ReminderScheduler.lightReminderTasks(
+                in: [completedFocusTask] + queuedTasks,
+                focusTaskIDs: [completedFocusTask.id]
+            ).isEmpty,
+            "今日专注全部完成后不应退回普通轻提醒"
+        )
 
         let finalFrame = NSRect(x: 400, y: 500, width: 340, height: 180)
         let startFrame = ReminderPanelController.presentationStartFrame(
@@ -193,6 +276,10 @@ struct ReminderSchedulerSmoke {
         precondition(
             !appDelegateSource.contains("let focusPresentation = testing ? nil"),
             "测试提醒不能跳过专注提醒模式"
+        )
+        precondition(
+            appDelegateSource.contains("ReminderPanelController.tasksForFocusTest"),
+            "今日专注全部完成后，测试按钮仍应展示专注提醒示例"
         )
         let testReminderStart = appDelegateSource.range(of: "onTestReminder: { [weak self] in")!
         let testReminderEnd = appDelegateSource.range(

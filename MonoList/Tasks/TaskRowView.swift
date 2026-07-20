@@ -3,7 +3,7 @@ import SwiftUI
 struct TaskRowView: View {
     let item: TaskItem
     let onSave: (String) -> Void
-    let onComplete: (String) -> Void
+    let onComplete: (String) -> Bool
     let onDelete: () -> Void
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
@@ -21,11 +21,13 @@ struct TaskRowView: View {
     @State private var isHovered = false
     @State private var isEditorFocused = false
     @State private var isReminderPopoverPresented = false
+    @State private var isCompleting = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         item: TaskItem,
         onSave: @escaping (String) -> Void,
-        onComplete: @escaping (String) -> Void,
+        onComplete: @escaping (String) -> Bool,
         onDelete: @escaping () -> Void,
         onMoveUp: @escaping () -> Void,
         onMoveDown: @escaping () -> Void,
@@ -56,26 +58,28 @@ struct TaskRowView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 9) {
-            Button {
-                onComplete(text)
-            } label: {
-                Group {
-                    if let focusOrder {
-                        Text("\(focusOrder)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 19, height: 19)
-                            .background(Color.primary, in: Circle())
-                    } else {
-                        Image(systemName: "circle")
-                            .font(.system(size: 18, weight: .regular))
-                            .foregroundStyle(.secondary)
-                    }
+            if let focusOrder {
+                Button {
+                    beginCompletion()
+                } label: {
+                    Text("\(focusOrder)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 19, height: 19)
+                        .background(Color.primary, in: Circle())
+                        .frame(width: 28, height: 28)
                 }
-                .frame(width: 28, height: 28)
+                .buttonStyle(.plain)
+                .disabled(isCompleting)
+                .help("标记为完成")
+            } else {
+                TaskCompletionButton(
+                    symbolSize: 18,
+                    frameSize: 28,
+                    isCompleting: isCompleting,
+                    action: beginCompletion
+                )
             }
-            .buttonStyle(.plain)
-            .help("标记为完成")
 
             VStack(alignment: .leading, spacing: 4) {
                 Group {
@@ -94,6 +98,8 @@ struct TaskRowView: View {
                             }
                     } else {
                         Text(text)
+                            .strikethrough(isCompleting)
+                            .foregroundStyle(isCompleting ? .secondary : .primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .contentShape(Rectangle())
@@ -106,16 +112,26 @@ struct TaskRowView: View {
                 }
                 if !isEditingMode {
                     reminderStatusLine
+                        .transition(.opacity)
                 }
             }
             .padding(.vertical, 5)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(isCompleting ? 0.66 : 1)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.16),
+                value: reminderTitle
+            )
 
             Button(action: onDelete) {
                 Image(systemName: "trash")
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
                     .opacity(isHovered || isSelected ? 1 : 0)
+                    .animation(
+                        reduceMotion ? nil : .easeOut(duration: 0.16),
+                        value: isHovered || isSelected
+                    )
             }
             .buttonStyle(.plain)
             .help("删除")
@@ -126,9 +142,17 @@ struct TaskRowView: View {
             isSelected && !isEditingMode ? Color.primary.opacity(0.055) : .clear,
             in: RoundedRectangle(cornerRadius: 9)
         )
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: 0.16),
+            value: isSelected
+        )
         .contentShape(Rectangle())
         .simultaneousGesture(TapGesture().onEnded(onSelect))
         .onHover { isHovered = $0 }
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: 0.16),
+            value: isCompleting
+        )
         .onChange(of: isEditorFocused) { oldValue, newValue in
             if oldValue && !newValue && isEditingMode {
                 finishEditing()
@@ -213,6 +237,23 @@ struct TaskRowView: View {
         onEditingChanged(true)
     }
 
+    private func beginCompletion() {
+        guard !isCompleting else { return }
+        if isEditingMode {
+            finishEditing()
+        }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+            isCompleting = true
+        }
+        let delay = reduceMotion ? 0 : 0.24
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard !onComplete(text) else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+                isCompleting = false
+            }
+        }
+    }
+
     private func finishEditing() {
         saveIfNeeded()
         isEditorFocused = false
@@ -241,6 +282,39 @@ struct TaskRowView: View {
         let hour = minuteOfDay / 60
         let minute = minuteOfDay % 60
         return String(format: "%02d:%02d", hour, minute)
+    }
+}
+
+struct TaskCompletionButton: View {
+    let symbolSize: CGFloat
+    let frameSize: CGFloat
+    let isCompleting: Bool
+    let action: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Image(systemName: "circle")
+                    .opacity(isCompleting ? 0 : 1)
+                    .scaleEffect(isCompleting ? 0.82 : 1)
+                Image(systemName: "checkmark.circle.fill")
+                    .opacity(isCompleting ? 1 : 0)
+                    .scaleEffect(isCompleting ? 1 : 0.82)
+            }
+            .font(.system(size: symbolSize, weight: .regular))
+            .foregroundStyle(.secondary)
+            .frame(width: frameSize, height: frameSize)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.16),
+                value: isCompleting
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isCompleting)
+        .help(isCompleting ? "已完成" : "标记为完成")
+        .accessibilityLabel(isCompleting ? "已完成" : "标记为完成")
     }
 }
 

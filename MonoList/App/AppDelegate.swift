@@ -145,14 +145,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     pendingTasks: pendingTasks,
                     lightReminderTasks: lightReminderTasks
                 )
-                if !values.reminderEnabled || lightReminderTasks.isEmpty {
+                if (!values.reminderEnabled || lightReminderTasks.isEmpty) &&
+                    reminderPanelController?.isDedicatedReminder != true {
                     reminderPanelController?.close()
                 }
             }
             .store(in: &cancellables)
         scheduler.startPolling { [weak self] in
             guard let self else { return true }
-            return self.windowCoordinator?.isMainPanelVisible == true
+            return self.windowCoordinator?.isMainPanelVisible == true ||
+                self.windowCoordinator?.isSettingsVisible == true ||
+                self.reminderPanelController?.isVisible == true
         }
 
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -235,7 +238,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let focusPresentation = currentFocusReminderPresentation()
         let tasks: [TaskItem]
         if let focusPresentation {
-            tasks = focusPresentation.tasks
+            tasks = testing
+                ? ReminderPanelController.tasksForFocusTest(focusPresentation.tasks)
+                : focusPresentation.tasks
         } else if testing {
             tasks = ReminderPanelController.tasksForTest(pendingTasks)
         } else {
@@ -280,6 +285,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             position: settings.reminderPosition.supportedValue,
             menuBarButton: nil,
             title: "定时提醒",
+            isDedicatedReminder: true,
             playsSound: settings.reminderSoundEnabled,
             soundName: settings.reminderSoundName,
             onOpen: { [weak self] in
@@ -401,13 +407,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         focusStore: FocusStore,
         at date: Date = Date()
     ) -> [TaskItem] {
-        let pendingTasks = tasks.filter { $0.status == .pending }
-        guard focusStore.isActive(at: date) else { return pendingTasks }
-        let tasksByID = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
-        let currentTask = focusStore.taskIDs(at: date)
-            .compactMap { tasksByID[$0] }
-            .first { $0.status == .pending }
-        return currentTask.map { [$0] } ?? []
+        ReminderScheduler.lightReminderTasks(
+            in: tasks,
+            focusTaskIDs: focusStore.isActive(at: date)
+                ? focusStore.taskIDs(at: date)
+                : nil
+        )
     }
 
     private func currentFocusReminderPresentation(
