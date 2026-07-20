@@ -107,6 +107,13 @@ final class FocusStore: ObservableObject {
         loadError = nil
     }
 
+    func clearSelection() throws {
+        guard selection != nil else { return }
+        try persist(nil)
+        selection = nil
+        loadError = nil
+    }
+
     func reconcile(existingTaskIDs: Set<UUID>) {
         guard var selection else { return }
         let validIDs = selection.orderedTaskIDs.filter(existingTaskIDs.contains)

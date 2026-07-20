@@ -14,12 +14,18 @@ struct MenuBarBridgeSmoke {
         precondition(MenuBarBridgeProtocol.title(pendingCount: 0).isEmpty)
         precondition(MenuBarBridgeProtocol.title(pendingCount: 3) == "3")
         precondition(
-            MenuBarBridgeProtocol.title(pendingCount: 8, focusRemainingCount: 2) ==
-                "专注 2"
+            MenuBarBridgeProtocol.title(
+                pendingCount: 8,
+                focusTaskCount: 3,
+                focusCompleted: false
+            ) == "专注 3"
         )
         precondition(
-            MenuBarBridgeProtocol.title(pendingCount: 8, focusRemainingCount: 0) ==
-                "专注 ✓"
+            MenuBarBridgeProtocol.title(
+                pendingCount: 8,
+                focusTaskCount: 3,
+                focusCompleted: true
+            ) == "专注 ✓"
         )
         precondition(
             MenuBarBridgeProtocol.toolTip(
@@ -32,6 +38,14 @@ struct MenuBarBridgeSmoke {
                 currentFocusText: nil,
                 focusCompleted: true
             ) == "今日专注已完成"
+        )
+        let appDelegateSource = try! String(
+            contentsOfFile: "MonoList/App/AppDelegate.swift",
+            encoding: .utf8
+        )
+        precondition(
+            appDelegateSource.contains("focusTaskCount: focusTasks.count"),
+            "菜单栏应显示今日专注总数，而不是剩余数"
         )
         precondition(MenuBarBridgeProtocol.showMainPanel.rawValue.hasPrefix(
             "com.qingcheng.monolist."

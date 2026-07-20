@@ -232,10 +232,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reminderScheduler?.reminderClosed(pendingCount: 0)
             return
         }
-        let focusPresentation = testing ? nil : currentFocusReminderPresentation()
-        let tasks = testing
-            ? ReminderPanelController.tasksForTest(pendingTasks)
-            : focusPresentation?.tasks ?? pendingTasks
+        let focusPresentation = currentFocusReminderPresentation()
+        let tasks: [TaskItem]
+        if let focusPresentation {
+            tasks = focusPresentation.tasks
+        } else if testing {
+            tasks = ReminderPanelController.tasksForTest(pendingTasks)
+        } else {
+            tasks = pendingTasks
+        }
         guard !tasks.isEmpty else {
             reminderScheduler?.reminderClosed(pendingCount: 0)
             return
@@ -360,7 +365,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         configuration.arguments = [
             String(ProcessInfo.processInfo.processIdentifier),
             String(status.pendingCount),
-            String(status.focusRemainingCount ?? -1),
+            String(status.focusTaskCount ?? -1),
+            status.focusCompleted ? "1" : "0",
             status.currentFocusText ?? "",
         ]
         NSWorkspace.shared.openApplication(
@@ -459,7 +465,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard focusStore.isActive(at: date) else {
             return MenuBarStatus(
                 pendingCount: pendingCount,
-                focusRemainingCount: nil,
+                focusTaskCount: nil,
+                focusCompleted: false,
                 currentFocusText: nil
             )
         }
@@ -468,15 +475,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pendingFocusTasks = focusTasks.filter { $0.status == .pending }
         return MenuBarStatus(
             pendingCount: pendingCount,
-            focusRemainingCount: pendingFocusTasks.count,
+            focusTaskCount: focusTasks.count,
+            focusCompleted: pendingFocusTasks.isEmpty,
             currentFocusText: pendingFocusTasks.first?.text
         )
     }
 
     private static func postMenuBarStatus(_ status: MenuBarStatus) {
         var userInfo: [String: Any] = ["count": status.pendingCount]
-        if let focusRemainingCount = status.focusRemainingCount {
-            userInfo["focusRemaining"] = focusRemainingCount
+        if let focusTaskCount = status.focusTaskCount {
+            userInfo["focusTaskCount"] = focusTaskCount
+            userInfo["focusCompleted"] = status.focusCompleted
         }
         if let currentFocusText = status.currentFocusText {
             userInfo["currentFocusText"] = currentFocusText
@@ -493,7 +502,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 private struct MenuBarStatus: Equatable {
     let pendingCount: Int
-    let focusRemainingCount: Int?
+    let focusTaskCount: Int?
+    let focusCompleted: Bool
     let currentFocusText: String?
 }
 

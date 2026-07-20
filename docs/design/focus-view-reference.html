@@ -886,6 +886,7 @@
             ${button("调整", "text-button", "adjust", "调整今日专注")}
             ${button("全部", "text-button", "show-list", "查看全部待办")}
             ${button("＋", "icon-button", "capture", "新增待办")}
+            ${button("⌘", "icon-button", "noop", "打开控制台")}
           </div>
         </div>`;
       }
@@ -938,6 +939,8 @@
 
     function selectionPanel() {
       const isAdjusting = state.selectionOrigin === "focus";
+      const primaryTitle = isAdjusting && state.selected.length === 0 ? "结束专注" : (isAdjusting ? "完成调整" : "开始专注");
+      const primaryDisabled = !isAdjusting && state.selected.length === 0;
       return `<div class="panel" data-screen-label="选择今日专注">
         ${panelHeader("select")}
         <div class="list-content">${groupedTasks()}</div>
@@ -945,7 +948,7 @@
           <span class="selection-count">已选 ${state.selected.length} 件${state.selected.length === 3 ? " · 已到上限" : ""}</span>
           <span class="spacer"></span>
           <button type="button" class="plain-action" data-action="clear-select">清空</button>
-          <button type="button" class="primary-action" data-action="start-focus" ${state.selected.length === 0 ? "disabled" : ""}>${isAdjusting ? "完成调整" : "开始专注"}</button>
+          <button type="button" class="primary-action" data-action="start-focus" ${primaryDisabled ? "disabled" : ""}>${primaryTitle}</button>
         </div>
       </div>`;
     }
@@ -1064,7 +1067,7 @@
 
       const remaining = state.selected.filter(id => !state.completed.has(id)).length;
       menuBarText.textContent = state.focusStarted
-        ? (remaining > 0 ? `专注 ${remaining}` : "专注 ✓")
+        ? (remaining > 0 ? `专注 ${state.selected.length}` : "专注 ✓")
         : "待办 6";
       renderNotes();
 
@@ -1094,6 +1097,12 @@
       if (action === "cancel-select") cancelSelection();
       if (action === "show-list") setScenario("list");
       if (action === "start-focus") {
+        if (state.selectionOrigin === "focus" && state.selected.length === 0) {
+          state.focusStarted = false;
+          state.completed.clear();
+          setScenario("list");
+          return;
+        }
         state.focusStarted = true;
         setScenario("focus");
       }

@@ -16,13 +16,16 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             .dropFirst(2)
             .first
             .flatMap(Int.init) ?? 0
-        let focusRemaining = ProcessInfo.processInfo.arguments
+        let focusTaskCount = ProcessInfo.processInfo.arguments
             .dropFirst(3)
             .first
             .flatMap(Int.init)
             .flatMap { $0 >= 0 ? $0 : nil }
-        let currentFocusText = ProcessInfo.processInfo.arguments
+        let focusCompleted = ProcessInfo.processInfo.arguments
             .dropFirst(4)
+            .first == "1"
+        let currentFocusText = ProcessInfo.processInfo.arguments
+            .dropFirst(5)
             .first
             .flatMap { $0.isEmpty ? nil : $0 }
 
@@ -35,11 +38,12 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         item.button?.imagePosition = .imageLeading
         item.button?.title = MenuBarBridgeProtocol.title(
             pendingCount: count,
-            focusRemainingCount: focusRemaining
+            focusTaskCount: focusTaskCount,
+            focusCompleted: focusCompleted
         )
         item.button?.toolTip = MenuBarBridgeProtocol.toolTip(
             currentFocusText: currentFocusText,
-            focusCompleted: focusRemaining == 0
+            focusCompleted: focusCompleted
         )
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
@@ -56,17 +60,20 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             guard let countNumber = notification.userInfo?["count"] as? NSNumber else {
                 return
             }
-            let focusRemainingNumber = notification.userInfo?["focusRemaining"] as? NSNumber
-            let focusRemaining = focusRemainingNumber?.intValue
+            let focusTaskCountNumber = notification.userInfo?["focusTaskCount"] as? NSNumber
+            let focusTaskCount = focusTaskCountNumber?.intValue
+            let focusCompleted =
+                (notification.userInfo?["focusCompleted"] as? NSNumber)?.boolValue ?? false
             let currentFocusText = notification.userInfo?["currentFocusText"] as? String
             self?.statusItem?.button?.title =
                 MenuBarBridgeProtocol.title(
                     pendingCount: countNumber.intValue,
-                    focusRemainingCount: focusRemaining
+                    focusTaskCount: focusTaskCount,
+                    focusCompleted: focusCompleted
                 )
             self?.statusItem?.button?.toolTip = MenuBarBridgeProtocol.toolTip(
                 currentFocusText: currentFocusText,
-                focusCompleted: focusRemaining == 0
+                focusCompleted: focusCompleted
             )
             DispatchQueue.main.async { [weak self] in
                 self?.reportStatusItemFrameIfNeeded()

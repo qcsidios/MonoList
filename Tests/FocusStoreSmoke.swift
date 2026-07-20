@@ -68,6 +68,19 @@ struct FocusStoreSmoke {
         try require(reloaded.taskIDs(at: afterBoundary) == [ids[0], ids[2]],
                     "保留完成项的调整没有生效")
 
+        try reloaded.clearSelection()
+        try require(!reloaded.isActive(at: afterBoundary),
+                    "清空后今日专注仍然生效")
+        try require(reloaded.selection == nil,
+                    "清空后不应保留空的专注记录")
+
+        try reloaded.setSelection(
+            [ids[0], ids[2]],
+            existingTaskIDs: Set(ids),
+            completedTaskIDs: [],
+            at: afterBoundary
+        )
+
         let nextDay = calendar.date(byAdding: .day, value: 1, to: afterBoundary)!
         try require(!reloaded.isActive(at: nextDay), "跨日后不应自动沿用昨日专注")
         try require(reloaded.suggestedTaskIDs(at: nextDay) == [ids[0], ids[2]],

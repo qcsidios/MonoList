@@ -441,19 +441,18 @@ struct TaskListView: View {
                 }
                 Spacer()
                 Button("清空") {
-                    let lockedIDs = Set(lockedFocusTasks.map(\.id))
-                    focusSelectionDraft.removeAll { !lockedIDs.contains($0) }
+                    focusSelectionDraft.removeAll()
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
-                .disabled(focusSelectionDraft.count == lockedFocusTasks.count)
+                .disabled(focusSelectionDraft.isEmpty)
 
-                Button(selectionOrigin == .focus ? "完成调整" : "开始专注") {
+                Button(focusSelectionPrimaryTitle) {
                     saveFocusSelection()
                 }
                 .buttonStyle(FocusPrimaryButtonStyle())
-                .disabled(focusSelectionDraft.isEmpty)
+                .disabled(selectionOrigin == .list && focusSelectionDraft.isEmpty)
             }
             .padding(.horizontal, 14)
             .frame(height: 50)
@@ -648,6 +647,14 @@ struct TaskListView: View {
             .buttonStyle(HeaderIconButtonStyle())
             .help("新增待办")
             .accessibilityLabel("新增待办")
+            Button {
+                onOpenSettings()
+            } label: {
+                HeaderIconLabel(systemName: "gearshape")
+            }
+            .buttonStyle(HeaderIconButtonStyle())
+            .help("打开控制台")
+            .accessibilityLabel("打开控制台")
         }
         .padding(.leading, 14)
         .padding(.trailing, 9)
@@ -702,7 +709,7 @@ struct TaskListView: View {
                 .frame(minHeight: 142, alignment: .top)
                 .background(
                     focusKeyboardID == currentFocusTask.id
-                        ? Color.accentColor.opacity(0.08) : .clear,
+                        ? Color.primary.opacity(0.045) : .clear,
                     in: RoundedRectangle(cornerRadius: 10)
                 )
                 .contextMenu {
@@ -760,7 +767,7 @@ struct TaskListView: View {
         .frame(minHeight: 47)
         .contentShape(Rectangle())
         .background(
-            focusKeyboardID == item.id ? Color.accentColor.opacity(0.08) : .clear,
+            focusKeyboardID == item.id ? Color.primary.opacity(0.045) : .clear,
             in: RoundedRectangle(cornerRadius: 9)
         )
         .contextMenu {
@@ -1046,6 +1053,13 @@ struct TaskListView: View {
 
     private func saveFocusSelection() {
         do {
+            if focusSelectionDraft.isEmpty {
+                try focusStore.clearSelection()
+                displayMode = .list
+                focusKeyboardID = nil
+                onFocusInteraction()
+                return
+            }
             try focusStore.setSelection(
                 focusSelectionDraft,
                 existingTaskIDs: Set(store.tasks.map(\.id)),
@@ -1058,6 +1072,13 @@ struct TaskListView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var focusSelectionPrimaryTitle: String {
+        if selectionOrigin == .focus && focusSelectionDraft.isEmpty {
+            return "结束专注"
+        }
+        return selectionOrigin == .focus ? "完成调整" : "开始专注"
     }
 
     private func submitFocusCapture() {
@@ -1212,7 +1233,7 @@ struct TaskListView: View {
         }
         if (event.keyCode == 36 || event.keyCode == 76),
            event.modifierFlags.contains(.command),
-           !focusSelectionDraft.isEmpty {
+           selectionOrigin == .focus || !focusSelectionDraft.isEmpty {
             saveFocusSelection()
             return nil
         }

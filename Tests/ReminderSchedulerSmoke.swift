@@ -164,6 +164,31 @@ struct ReminderSchedulerSmoke {
         reminderView.layoutSubtreeIfNeeded()
         precondition(reminderView.fittingSize.height < 110)
 
+        let appDelegateSource = try! String(
+            contentsOfFile: "MonoList/App/AppDelegate.swift",
+            encoding: .utf8
+        )
+        precondition(
+            appDelegateSource.contains(
+                "let focusPresentation = currentFocusReminderPresentation()"
+            ),
+            "测试提醒也应读取当前专注任务"
+        )
+        precondition(
+            !appDelegateSource.contains("let focusPresentation = testing ? nil"),
+            "测试提醒不能跳过专注提醒模式"
+        )
+        let testReminderStart = appDelegateSource.range(of: "onTestReminder: { [weak self] in")!
+        let testReminderEnd = appDelegateSource.range(
+            of: "\n            }\n        )",
+            range: testReminderStart.lowerBound..<appDelegateSource.endIndex
+        )!
+        let testReminderHandler = appDelegateSource[
+            testReminderStart.lowerBound..<testReminderEnd.upperBound
+        ]
+        precondition(!testReminderHandler.contains("isTesting"))
+        precondition(testReminderHandler.contains("showReminder(testing: true)"))
+
         guard !NSScreen.screens.isEmpty else {
             print("Reminder scheduler smoke passed (界面用例因无可用屏幕而跳过).")
             return
@@ -210,21 +235,6 @@ struct ReminderSchedulerSmoke {
         )
         precondition(playedSounds == ["Ping", "Ping"])
         controller.close(animated: false)
-
-        let appDelegateSource = try! String(
-            contentsOfFile: "MonoList/App/AppDelegate.swift",
-            encoding: .utf8
-        )
-        let testReminderStart = appDelegateSource.range(of: "onTestReminder: { [weak self] in")!
-        let testReminderEnd = appDelegateSource.range(
-            of: "\n            }\n        )",
-            range: testReminderStart.lowerBound..<appDelegateSource.endIndex
-        )!
-        let testReminderHandler = appDelegateSource[
-            testReminderStart.lowerBound..<testReminderEnd.upperBound
-        ]
-        precondition(!testReminderHandler.contains("isTesting"))
-        precondition(testReminderHandler.contains("showReminder(testing: true)"))
 
         print("Reminder scheduler smoke passed.")
     }

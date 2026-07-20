@@ -149,4 +149,30 @@ if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDO
   exit 1
 fi
 
+FOCUS_HEADER_BLOCK="$(awk '
+  /private var focusHeader/ { capture = 1 }
+  /private var focusCaptureRow/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+if ! echo "$FOCUS_HEADER_BLOCK" | grep -q 'onOpenSettings()'; then
+  echo "今日专注页必须保留控制台入口。" >&2
+  exit 1
+fi
+
+FOCUS_TASK_BLOCK="$(awk '
+  /private var focusTaskContent/ { capture = 1 }
+  /private func tasks\(in group:/ { capture = 0 }
+  capture { print }
+' "$TASK_LIST")"
+if echo "$FOCUS_TASK_BLOCK" | grep -q 'Color.accentColor'; then
+  echo "专注任务不能使用蓝色选中背景。" >&2
+  exit 1
+fi
+
+if ! grep -q 'try focusStore.clearSelection()' "$TASK_LIST" ||
+   ! grep -q 'return "结束专注"' "$TASK_LIST"; then
+  echo "清空今日专注后必须能够保存并结束专注。" >&2
+  exit 1
+fi
+
 echo "UI source style check passed."
