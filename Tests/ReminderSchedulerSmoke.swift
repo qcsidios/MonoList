@@ -121,17 +121,27 @@ struct ReminderSchedulerSmoke {
         )
         let globalDeadlineBeforeDedicatedReminder = scheduler.deadline
         wallClock = fixedDate(hour: 18, minute: 0, calendar: calendar)
+        now += 60
         scheduler.evaluate(interfaceBusy: true)
         precondition(dedicatedReminderIDs == [dedicatedID])
         precondition(
-            scheduler.deadline == globalDeadlineBeforeDedicatedReminder,
-            "单条提醒不应重排全局轻提醒"
+            scheduler.deadline != globalDeadlineBeforeDedicatedReminder,
+            "单条提醒触发后应重置全局轻提醒"
+        )
+
+        let deadlineBeforeInteraction = scheduler.deadline
+        now += 100
+        scheduler.meaningfulInteraction(pendingCount: 1)
+        precondition(
+            scheduler.deadline != deadlineBeforeInteraction,
+            "查看或操作专注任务后应重新计算轻提醒"
         )
 
         let testTasks = ReminderPanelController.tasksForTest([])
         precondition(testTasks.count == 1)
         precondition(testTasks[0].text == "这是一次轻提醒测试")
         precondition(ReminderPanelController.resolvedSoundName("不存在的声音") == "Glass")
+        precondition(ReminderPanelController.displayDurationSeconds == 6)
 
         let finalFrame = NSRect(x: 400, y: 500, width: 340, height: 180)
         let startFrame = ReminderPanelController.presentationStartFrame(

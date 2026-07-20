@@ -22,4 +22,21 @@ enum MenuBarBridgeProtocol {
     static func title(pendingCount: Int) -> String {
         pendingCount == 0 ? "" : "\(pendingCount)"
     }
+
+    static func title(pendingCount: Int, focusRemainingCount: Int?) -> String {
+        guard let focusRemainingCount else {
+            return title(pendingCount: pendingCount)
+        }
+        return focusRemainingCount == 0 ? "专注 ✓" : "专注 \(focusRemainingCount)"
+    }
+
+    static func toolTip(currentFocusText: String?, focusCompleted: Bool) -> String {
+        if focusCompleted {
+            return "今日专注已完成"
+        }
+        if let currentFocusText, !currentFocusText.isEmpty {
+            return "当前专注：\(currentFocusText)"
+        }
+        return "MonoList"
+    }
 }

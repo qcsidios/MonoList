@@ -4,11 +4,13 @@ import SwiftUI
 
 @MainActor
 final class ReminderPanelController: ObservableObject {
+    static let displayDurationSeconds: TimeInterval = 6
+
     @Published private(set) var isTesting = false
 
     private var panel: NSPanel?
     private var countdownTimer: Timer?
-    private var remainingTenths = 30
+    private var remainingTenths = Int(displayDurationSeconds * 10)
     private var model: ReminderPresentationModel?
     private var onClose: (() -> Void)?
     private var finalFrame: NSRect?
@@ -59,6 +61,8 @@ final class ReminderPanelController: ObservableObject {
         tasks: [TaskItem],
         position: ReminderPosition,
         menuBarButton: NSStatusBarButton?,
+        title: String = "待办提醒",
+        statusText: String? = nil,
         testing: Bool = false,
         playsSound: Bool = true,
         soundName: String = "Glass",
@@ -75,6 +79,8 @@ final class ReminderPanelController: ObservableObject {
         let model = ReminderPresentationModel()
         let hostingView = NSHostingView(
             rootView: ReminderView(
+                title: title,
+                statusText: statusText,
                 totalCount: tasks.count,
                 taskTexts: snapshot.map(\.text),
                 model: model,
@@ -124,7 +130,7 @@ final class ReminderPanelController: ObservableObject {
         self.finalFrame = frame
         isTesting = testing
         isClosing = false
-        remainingTenths = 30
+        remainingTenths = Int(Self.displayDurationSeconds * 10)
         if playsSound {
             playSound(Self.resolvedSoundName(soundName))
         }

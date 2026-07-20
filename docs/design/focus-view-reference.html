@@ -1,0 +1,1134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MonoList · 今日专注视图视觉基准</title>
+  <!--
+    设计前提：延续 MonoList 现有 336 pt 菜单栏面板、系统字体、纯白背景与灰阶控件。
+    设计判断：今日专注是普通清单的执行视图，不是独立任务类型或对等模式。
+    关键层级：当前一件占主要空间，随后两件只提供方向；提醒只呈现当前一件。
+  -->
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d1d1f;
+      --secondary: #6e6e73;
+      --tertiary: #9a9aa0;
+      --line: rgba(29, 29, 31, 0.09);
+      --line-strong: rgba(29, 29, 31, 0.16);
+      --panel: #ffffff;
+      --control: #f2f2f4;
+      --control-hover: #e9e9ec;
+      --selected: #1d1d1f;
+      --canvas: #d7d9dd;
+      --danger: #d92d20;
+      --blue: #0a84ff;
+      --ease: cubic-bezier(.2, .75, .2, 1);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    button, input { font: inherit; }
+
+    button { -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background: #ececef;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 38px 0 54px;
+    }
+
+    .page-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--secondary);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 680;
+      letter-spacing: -.045em;
+    }
+
+    .subtitle {
+      max-width: 690px;
+      margin: 10px 0 0;
+      color: var(--secondary);
+      font-size: 14px;
+      line-height: 1.75;
+      text-wrap: pretty;
+    }
+
+    .decision {
+      max-width: 300px;
+      margin: 0;
+      color: var(--secondary);
+      font-size: 12px;
+      line-height: 1.65;
+      text-align: right;
+    }
+
+    .decision strong { color: var(--ink); }
+
+    .scenario-nav {
+      display: flex;
+      gap: 5px;
+      width: fit-content;
+      max-width: 100%;
+      margin-bottom: 18px;
+      padding: 4px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255, 255, 255, .72);
+    }
+
+    .scenario-button {
+      min-height: 32px;
+      padding: 0 13px;
+      border: 0;
+      border-radius: 8px;
+      color: var(--secondary);
+      background: transparent;
+      font-size: 12px;
+      font-weight: 590;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: color 160ms var(--ease), background 160ms var(--ease), box-shadow 160ms var(--ease);
+    }
+
+    .scenario-button:hover { color: var(--ink); background: rgba(0, 0, 0, .035); }
+
+    .scenario-button[aria-selected="true"] {
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .10);
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 258px;
+      min-height: 650px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, .10);
+      border-radius: 22px;
+      background: #f7f7f8;
+      box-shadow: 0 22px 70px rgba(0, 0, 0, .10);
+    }
+
+    .desktop {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 22% 28%, rgba(255, 255, 255, .76), transparent 33%),
+        linear-gradient(145deg, #dfe1e4 0%, #c6cbd1 55%, #b9c0c8 100%);
+    }
+
+    .desktop::after {
+      position: absolute;
+      inset: 25px;
+      border: 1px solid rgba(255, 255, 255, .22);
+      border-radius: 25px;
+      content: "";
+      pointer-events: none;
+    }
+
+    .menu-bar {
+      position: relative;
+      z-index: 8;
+      display: flex;
+      height: 29px;
+      align-items: center;
+      padding: 0 15px;
+      border-bottom: 1px solid rgba(0, 0, 0, .08);
+      background: rgba(248, 248, 249, .82);
+      box-shadow: 0 1px 8px rgba(0, 0, 0, .05);
+      backdrop-filter: blur(24px) saturate(1.25);
+      font-size: 11px;
+      font-weight: 580;
+    }
+
+    .menu-left, .menu-right {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .menu-right { margin-left: auto; gap: 13px; }
+
+    .apple { font-size: 14px; line-height: 1; }
+
+    .monolist-menu {
+      display: flex;
+      min-height: 22px;
+      align-items: center;
+      gap: 5px;
+      padding: 0 7px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, .07);
+    }
+
+    .menudot {
+      width: 6px;
+      height: 6px;
+      border: 1.4px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .stage {
+      position: absolute;
+      z-index: 3;
+      top: 29px;
+      left: 50%;
+      display: grid;
+      width: 100%;
+      height: calc(100% - 29px);
+      place-items: start center;
+      transform: translateX(-50%);
+    }
+
+    .panel {
+      position: relative;
+      width: 336px;
+      margin-top: 0;
+      overflow: hidden;
+      border: 1px solid rgba(0, 0, 0, .11);
+      border-radius: 0 0 14px 14px;
+      background: var(--panel);
+      box-shadow: 0 18px 46px rgba(0, 0, 0, .20), 0 2px 7px rgba(0, 0, 0, .08);
+      transform-origin: top center;
+      animation: panel-in 200ms var(--ease) both;
+    }
+
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-4px) scaleY(.985); }
+      to { opacity: 1; transform: translateY(0) scaleY(1); }
+    }
+
+    .panel-header {
+      display: flex;
+      height: 54px;
+      align-items: center;
+      gap: 7px;
+      padding: 0 9px 0 14px;
+      border-bottom: 1px solid rgba(0, 0, 0, .07);
+    }
+
+    .panel-title {
+      display: flex;
+      min-width: 0;
+      align-items: baseline;
+      gap: 7px;
+    }
+
+    .panel-title strong {
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -.025em;
+      white-space: nowrap;
+    }
+
+    .panel-title span {
+      overflow: hidden;
+      color: var(--secondary);
+      font-size: 11px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .drag-space { min-width: 8px; flex: 1; align-self: stretch; }
+
+    .header-actions { display: flex; align-items: center; gap: 4px; }
+
+    .icon-button, .text-button {
+      display: grid;
+      min-width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 0;
+      border-radius: 8px;
+      color: #3a3a3e;
+      background: var(--control);
+      cursor: pointer;
+      transition: background 140ms ease, transform 100ms ease;
+    }
+
+    .icon-button:hover, .text-button:hover { background: var(--control-hover); }
+    .icon-button:active, .text-button:active { transform: scale(.96); }
+    .icon-button { font-size: 16px; line-height: 1; }
+    .text-button { padding: 0 9px; font-size: 11px; font-weight: 620; white-space: nowrap; }
+
+    .list-content { padding: 7px; }
+
+    .focus-entry {
+      display: flex;
+      min-height: 39px;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 6px;
+      padding: 0 10px;
+      border: 1px solid rgba(0, 0, 0, .08);
+      border-radius: 9px;
+      background: #fafafa;
+      cursor: pointer;
+    }
+
+    .focus-entry:hover { background: #f5f5f6; }
+
+    .focus-entry .mark {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      border-radius: 6px;
+      color: #fff;
+      background: #222225;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .focus-entry strong { font-size: 12px; font-weight: 640; }
+    .focus-entry span:last-child { margin-left: auto; color: var(--tertiary); font-size: 14px; }
+
+    .section-title {
+      display: flex;
+      height: 29px;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      color: var(--secondary);
+      font-size: 12px;
+      font-weight: 620;
+    }
+
+    .section-title small { color: var(--tertiary); font-size: 10px; font-weight: 550; }
+
+    .task-list { display: grid; gap: 1px; }
+
+    .task-row {
+      display: flex;
+      min-height: 38px;
+      align-items: center;
+      gap: 9px;
+      padding: 4px 8px;
+      border-radius: 9px;
+      background: transparent;
+      cursor: default;
+    }
+
+    .task-row:hover { background: rgba(0, 0, 0, .035); }
+    .task-row.selectable { cursor: pointer; }
+    .task-row.unavailable { color: var(--tertiary); }
+
+    .check, .order-badge {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      flex: 0 0 20px;
+      place-items: center;
+      border: 1.5px solid #8d8d92;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .order-badge {
+      border-color: var(--selected);
+      background: var(--selected);
+    }
+
+    .task-copy {
+      min-width: 0;
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .task-copy small {
+      display: block;
+      margin-top: 2px;
+      color: var(--tertiary);
+      font-size: 10px;
+    }
+
+    .selection-footer {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 10px 11px;
+      border-top: 1px solid var(--line);
+    }
+
+    .selection-count { color: var(--secondary); font-size: 11px; }
+    .selection-footer .spacer { flex: 1; }
+
+    .plain-action, .primary-action {
+      height: 30px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 630;
+      cursor: pointer;
+    }
+
+    .plain-action { color: var(--secondary); background: transparent; }
+    .plain-action:hover { background: var(--control); }
+    .primary-action { color: white; background: var(--selected); }
+    .primary-action:disabled { color: #aaa; background: #ededee; cursor: not-allowed; }
+
+    .focus-content {
+      display: flex;
+      min-height: 292px;
+      flex-direction: column;
+      padding: 0 14px 14px;
+    }
+
+    .current-task {
+      display: flex;
+      min-height: 144px;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 22px 5px 18px;
+      border-bottom: 1px solid var(--line);
+      transition: min-height 220ms var(--ease), opacity 180ms ease;
+    }
+
+    .focus-check {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      flex: 0 0 24px;
+      margin-top: 2px;
+      border: 1.7px solid #77777d;
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      transition: all 160ms ease;
+    }
+
+    .focus-check:hover { border-color: #222225; background: #f0f0f2; }
+
+    .current-copy {
+      max-width: 245px;
+      font-size: 18px;
+      font-weight: 640;
+      line-height: 1.42;
+      letter-spacing: -.018em;
+      text-wrap: pretty;
+    }
+
+    .current-copy small {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--tertiary);
+      font-size: 10px;
+      font-weight: 640;
+      letter-spacing: .06em;
+    }
+
+    .next-block { padding-top: 12px; }
+
+    .next-label {
+      margin: 0 0 4px 4px;
+      color: var(--tertiary);
+      font-size: 10px;
+      font-weight: 620;
+      letter-spacing: .04em;
+    }
+
+    .focus-next {
+      display: flex;
+      min-height: 48px;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 5px;
+      border-radius: 8px;
+    }
+
+    .focus-next:hover { background: rgba(0, 0, 0, .03); }
+    .focus-next .focus-check { width: 19px; height: 19px; flex-basis: 19px; margin-top: 0; }
+    .focus-next .focus-text { font-size: 14px; line-height: 1.4; }
+
+    .focus-task.completed {
+      min-height: 42px;
+      align-items: center;
+      padding-top: 8px;
+      padding-bottom: 8px;
+      color: var(--tertiary);
+    }
+
+    .focus-task.completed .focus-check {
+      border-color: #222225;
+      background: #222225;
+    }
+
+    .focus-task.completed .focus-check::after {
+      color: #fff;
+      content: "✓";
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .focus-task.completed .current-copy,
+    .focus-task.completed .focus-text {
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: line-through;
+    }
+
+    .focus-task.completed .current-copy small { display: none; }
+
+    .all-done {
+      display: grid;
+      min-height: 90px;
+      place-items: center;
+      color: var(--secondary);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .capture {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fafafa;
+    }
+
+    .capture .check { width: 18px; height: 18px; flex-basis: 18px; }
+
+    .capture input {
+      min-width: 0;
+      flex: 1;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font-size: 12px;
+    }
+
+    .capture input::placeholder { color: var(--tertiary); }
+
+    .toast {
+      position: absolute;
+      z-index: 9;
+      left: 50%;
+      bottom: 14px;
+      display: flex;
+      min-height: 34px;
+      align-items: center;
+      gap: 7px;
+      padding: 0 10px;
+      border-radius: 9px;
+      color: white;
+      background: rgba(28, 28, 30, .94);
+      box-shadow: 0 7px 20px rgba(0, 0, 0, .22);
+      font-size: 10px;
+      transform: translateX(-50%);
+      animation: toast-in 180ms var(--ease) both;
+      white-space: nowrap;
+    }
+
+    .toast button {
+      padding: 0;
+      border: 0;
+      color: #c8ddff;
+      background: transparent;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translate(-50%, 5px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    .reminder-wrap {
+      position: relative;
+      display: flex;
+      width: 100%;
+      height: 100%;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 48px;
+    }
+
+    .reminder {
+      width: 340px;
+      padding: 13px 15px 14px;
+      border: 1px solid rgba(0, 0, 0, .11);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, .96);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, .20), 0 2px 8px rgba(0, 0, 0, .07);
+      backdrop-filter: blur(22px);
+      animation: reminder-in 240ms var(--ease) both;
+    }
+
+    @keyframes reminder-in {
+      from { opacity: 0; transform: translateY(-11px) scale(.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .reminder-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 11px;
+    }
+
+    .reminder-kicker { font-size: 11px; font-weight: 650; }
+    .reminder-progress { color: var(--secondary); font-size: 11px; }
+    .reminder-close {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      margin-left: auto;
+      place-items: center;
+      border: 0;
+      border-radius: 7px;
+      color: var(--secondary);
+      background: var(--control);
+      cursor: pointer;
+    }
+
+    .reminder-body {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .reminder-body .focus-check { width: 21px; height: 21px; flex-basis: 21px; cursor: default; }
+    .reminder-text { font-size: 15px; font-weight: 590; line-height: 1.5; }
+    .reminder-note { margin: 9px 0 0 31px; color: var(--tertiary); font-size: 10px; }
+
+    .reminder.exact .reminder-kicker { color: var(--blue); }
+    .reminder.exact .reminder-note { color: var(--secondary); }
+
+    .reminder-switch {
+      position: absolute;
+      left: 50%;
+      bottom: 26px;
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .65);
+      transform: translateX(-50%);
+      backdrop-filter: blur(20px);
+    }
+
+    .reminder-switch button {
+      height: 29px;
+      padding: 0 11px;
+      border: 0;
+      border-radius: 7px;
+      color: var(--secondary);
+      background: transparent;
+      font-size: 10px;
+      font-weight: 620;
+      cursor: pointer;
+    }
+
+    .reminder-switch button.active { color: var(--ink); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+    .notes {
+      display: flex;
+      flex-direction: column;
+      padding: 24px 22px;
+      border-left: 1px solid var(--line);
+      background: #fbfbfc;
+    }
+
+    .notes-index { color: var(--tertiary); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+    .notes h2 { margin: 8px 0 9px; font-size: 19px; letter-spacing: -.025em; }
+    .notes-copy { margin: 0; color: var(--secondary); font-size: 12px; line-height: 1.72; text-wrap: pretty; }
+
+    .principles {
+      display: grid;
+      gap: 12px;
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .principles li {
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      color: var(--secondary);
+      font-size: 11px;
+      line-height: 1.58;
+    }
+
+    .principles strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 11px; }
+
+    .interaction-tip {
+      margin-top: auto;
+      padding: 11px 12px;
+      border-radius: 10px;
+      color: var(--secondary);
+      background: #f1f1f3;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+
+    .spec-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      margin-top: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--line);
+    }
+
+    .spec-item { min-height: 88px; padding: 15px 16px; background: rgba(255,255,255,.75); }
+    .spec-item strong { display: block; margin-bottom: 5px; font-size: 12px; }
+    .spec-item span { color: var(--secondary); font-size: 11px; line-height: 1.55; }
+
+    @media (max-width: 900px) {
+      .page-header { grid-template-columns: 1fr; }
+      .decision { max-width: 680px; text-align: left; }
+      .workbench { grid-template-columns: 1fr; }
+      .desktop { min-height: 620px; }
+      .notes { border-top: 1px solid var(--line); border-left: 0; }
+      .interaction-tip { margin-top: 20px; }
+      .spec-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      .page { width: min(100% - 20px, 1180px); padding-top: 24px; }
+      .desktop { min-height: 590px; }
+      .menu-left span:not(.apple), .menu-right span:not(.monolist-menu):not(:last-child) { display: none; }
+      .panel { transform: scale(.92); }
+      .spec-strip { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">MonoList · Focus View</p>
+        <h1>今天只看最重要的三件事</h1>
+        <p class="subtitle">普通清单继续负责收集与整理；“今日专注”只负责执行。不是两个模式来回切换，而是一条从全量任务收拢到当前任务、随时又能查看全部的自然路径。</p>
+      </div>
+      <p class="decision"><strong>推荐方向：</strong>当前一件占据约半个窗口，随后两件只提供方向；轻提醒只提示当前任务，不同时制造三个注意力入口。</p>
+    </header>
+
+    <nav class="scenario-nav" aria-label="设计状态">
+      <button class="scenario-button" type="button" data-scenario="list" aria-selected="true">1. 清单入口</button>
+      <button class="scenario-button" type="button" data-scenario="select" aria-selected="false">2. 选择 1–3 件</button>
+      <button class="scenario-button" type="button" data-scenario="focus" aria-selected="false">3. 正在专注</button>
+      <button class="scenario-button" type="button" data-scenario="done" aria-selected="false">4. 完成流转</button>
+      <button class="scenario-button" type="button" data-scenario="reminder" aria-selected="false">5. 提醒方式</button>
+    </nav>
+
+    <section class="workbench">
+      <div class="desktop" data-screen-label="MonoList 今日专注交互原型">
+        <div class="menu-bar">
+          <div class="menu-left"><span class="apple">●</span><strong>Finder</strong><span>文件</span><span>编辑</span><span>显示</span></div>
+          <div class="menu-right"><span class="monolist-menu"><i class="menudot"></i><b id="menuBarText">待办 6</b></span><span>⌁</span><span>82%</span><span>7月20日 周一 10:24</span></div>
+        </div>
+        <div class="stage" id="stage"></div>
+      </div>
+
+      <aside class="notes" aria-live="polite">
+        <span class="notes-index" id="noteIndex">状态 01</span>
+        <h2 id="noteTitle">从普通清单进入</h2>
+        <p class="notes-copy" id="noteCopy">入口是清单里的上下文动作，而不是一个对等模式开关。用户不会误以为专注视图拥有另一套任务数据。</p>
+        <ul class="principles" id="principles"></ul>
+        <p class="interaction-tip" id="interactionTip">可点击“选择今日专注”继续体验。</p>
+      </aside>
+    </section>
+
+    <section class="spec-strip" aria-label="视觉实现基准">
+      <div class="spec-item"><strong>窗口</strong><span>固定宽度 336 pt；专注态约 330–360 pt，高内容时不超过 447 pt。</span></div>
+      <div class="spec-item"><strong>文字层级</strong><span>当前任务 18 pt 半粗体、最多三行；随后任务 14–15 pt、最多两行。</span></div>
+      <div class="spec-item"><strong>提醒</strong><span>只显示当前任务与进度，6 秒收回；悬停暂停，不抢应用焦点。</span></div>
+      <div class="spec-item"><strong>动效</strong><span>切换约 200 ms，完成交接约 220 ms；减少动态效果时取消位移。</span></div>
+    </section>
+  </main>
+
+  <script>
+    const tasks = [
+      { id: 1, group: "短期任务", text: "完成 MonoList 今日专注功能规格" },
+      { id: 2, group: "短期任务", text: "整理本周要发布的产品素材", detail: "今天 15:30 提醒" },
+      { id: 3, group: "长期任务", text: "给合作伙伴回复方案与时间安排" },
+      { id: 4, group: "短期任务", text: "处理两封需要确认的邮件" },
+      { id: 5, group: "长期任务", text: "梳理下一版产品路线" },
+      { id: 6, group: "长期任务", text: "归档上周的用户反馈" }
+    ];
+
+    const scenarioNotes = {
+      list: {
+        index: "状态 01",
+        title: "从普通清单进入",
+        copy: "入口是清单里的上下文动作，而不是一个对等模式开关。用户不会误以为专注视图拥有另一套任务数据。",
+        principles: [
+          ["同一套数据", "短期任务、长期任务与专注任务始终是同一条任务。"],
+          ["低打扰入口", "只在顶部增加一行明确动作，不占用主标题和常用按钮。"],
+          ["随时返回", "设置完成后入口改为“继续专注”，全部清单始终可达。"]
+        ],
+        tip: "可点击“选择今日专注”继续体验。"
+      },
+      select: {
+        index: "状态 02",
+        title: "在原清单内排出顺序",
+        copy: "选择发生在熟悉的任务上下文里。序号同时表达是否入选和执行顺序，不需要额外弹窗或拖进另一个容器。",
+        principles: [
+          ["1–3 件即可", "不是必须凑满三件；只选一件也可以开始。"],
+          ["跨分组选择", "短期与长期任务都可成为今天最重要的事。"],
+          ["上限明确", "选满三件后不再增加，避免专注清单膨胀。"]
+        ],
+        tip: "点击任务可选中或取消，再点击“开始专注”。"
+      },
+      focus: {
+        index: "状态 03",
+        title: "当前一件 + 随后两件",
+        copy: "第一件任务使用主要字号与接近半屏的留白。后两件只保留必要上下文，让用户知道接下来是什么，但不与当前任务争夺注意力。",
+        principles: [
+          ["当前任务优先", "当前一件最多三行，避免为了大字体截断真正重要的内容。"],
+          ["收集不插队", "加号仍可快速记录，但新待办默认回到短期任务。"],
+          ["不是任务卡墙", "不用三个等权大卡片，视觉层级由字号、留白和顺序完成。"]
+        ],
+        tip: "点击圆圈体验任务完成交接；“＋”可试用快速收集。"
+      },
+      done: {
+        index: "状态 04",
+        title: "完成后保留当天承诺",
+        copy: "完成项收紧但不消失，下一件自然成为当前任务。当天三件形成完整记录，也避免完成一件后不断补入第四、第五件。",
+        principles: [
+          ["完成项不替换", "今天已经承诺过的三件始终可见，完成后不能被移出再补新任务。"],
+          ["下一件自动接棒", "无需重新选择，第一件未完成任务获得当前层级。"],
+          ["全部完成即安静", "保留三条勾选结果，同时停止所有专注轻提醒。"]
+        ],
+        tip: "点击任意圆圈可取消完成；也可返回“正在专注”重新体验。"
+      },
+      reminder: {
+        index: "状态 05",
+        title: "提醒方向，不重复清单",
+        copy: "专注轻提醒只回答“现在做什么”，不会再次把三件任务全部抛给用户。用户明确设置的单任务定时提醒拥有更高优先级。",
+        principles: [
+          ["6 秒无倒计时", "浮窗自动收回，悬停暂停，但不显示逐秒变化的压力文字。"],
+          ["不抢焦点", "提醒出现时不激活 MonoList，也不打断当前键盘输入。"],
+          ["明确提醒优先", "单任务定时提醒到达时覆盖本次专注轻提醒，并重置计时。"]
+        ],
+        tip: "下方可切换“专注轻提醒 / 单任务定时提醒”对比层级。"
+      }
+    };
+
+    const state = {
+      scenario: "list",
+      selected: [1, 2, 3],
+      completed: new Set(),
+      focusStarted: false,
+      selectionOrigin: "list",
+      selectionSnapshot: [1, 2, 3],
+      captureOpen: false,
+      toastVisible: false,
+      reminderType: "focus"
+    };
+
+    const stage = document.getElementById("stage");
+    const menuBarText = document.getElementById("menuBarText");
+    const noteIndex = document.getElementById("noteIndex");
+    const noteTitle = document.getElementById("noteTitle");
+    const noteCopy = document.getElementById("noteCopy");
+    const principles = document.getElementById("principles");
+    const interactionTip = document.getElementById("interactionTip");
+
+    function button(label, className, action, help) {
+      return `<button type="button" class="${className}" data-action="${action}" title="${help || label}">${label}</button>`;
+    }
+
+    function panelHeader(kind) {
+      if (kind === "focus") {
+        const completeCount = state.selected.filter(id => state.completed.has(id)).length;
+        const currentIndex = state.selected.findIndex(id => !state.completed.has(id));
+        const progress = currentIndex >= 0 ? currentIndex + 1 : state.selected.length;
+        const title = completeCount === state.selected.length && state.selected.length ? "今日完成" : "今日专注";
+        return `<div class="panel-header">
+          <div class="panel-title"><strong>${title}</strong><span>${progress}/${state.selected.length}</span></div>
+          <div class="drag-space"></div>
+          <div class="header-actions">
+            ${button("调整", "text-button", "adjust", "调整今日专注")}
+            ${button("全部", "text-button", "show-list", "查看全部待办")}
+            ${button("＋", "icon-button", "capture", "新增待办")}
+          </div>
+        </div>`;
+      }
+
+      const selectionTitle = state.selectionOrigin === "focus" ? "调整今日专注" : "选择今日专注";
+      const selectionAction = kind === "select" ? "取消" : "+";
+      const selectionCommand = kind === "select" ? "cancel-select" : "new-task";
+      return `<div class="panel-header">
+        <div class="panel-title"><strong>${kind === "select" ? selectionTitle : "今天"}</strong><span>${kind === "select" ? `${state.selected.length}/3` : "7月20日 周一"}</span></div>
+        <div class="drag-space"></div>
+        <div class="header-actions">
+          ${button(selectionAction, selectionAction === "+" ? "icon-button" : "text-button", selectionCommand, selectionAction === "+" ? "新增待办" : "取消选择")}
+          ${button("•••", "icon-button", "noop", "更多操作")}
+          ${button("⌘", "icon-button", "noop", "打开控制台")}
+        </div>
+      </div>`;
+    }
+
+    function groupedTasks() {
+      return ["短期任务", "长期任务"].map(group => {
+        const groupTasks = tasks.filter(task => task.group === group);
+        const rows = groupTasks.map(task => {
+          const order = state.selected.indexOf(task.id);
+          const selected = order >= 0;
+          const unavailable = state.scenario === "select" && state.selected.length >= 3 && !selected;
+          const showsFocusOrder = selected && (state.scenario === "select" || (state.scenario === "list" && state.focusStarted));
+          const marker = showsFocusOrder
+            ? `<span class="order-badge">${order + 1}</span>`
+            : `<span class="check"></span>`;
+          return `<div class="task-row ${state.scenario === "select" ? "selectable" : ""} ${unavailable ? "unavailable" : ""}" data-action="toggle-select" data-id="${task.id}">
+            ${marker}<span class="task-copy">${task.text}${task.detail ? `<small>${task.detail}</small>` : ""}</span>
+          </div>`;
+        }).join("");
+        return `<section><div class="section-title">${group}<small>${groupTasks.length}</small></div><div class="task-list">${rows}</div></section>`;
+      }).join("");
+    }
+
+    function listPanel() {
+      const entryLabel = state.focusStarted ? "继续专注" : "选择今日专注";
+      const entryAction = state.focusStarted ? "continue-focus" : "enter-select";
+      const entryMark = state.focusStarted ? "▶" : "1";
+      return `<div class="panel" data-screen-label="普通清单入口">
+        ${panelHeader("list")}
+        <div class="list-content">
+          <button type="button" class="focus-entry" data-action="${entryAction}"><span class="mark">${entryMark}</span><strong>${entryLabel}</strong><span>›</span></button>
+          ${groupedTasks()}
+        </div>
+      </div>`;
+    }
+
+    function selectionPanel() {
+      const isAdjusting = state.selectionOrigin === "focus";
+      return `<div class="panel" data-screen-label="选择今日专注">
+        ${panelHeader("select")}
+        <div class="list-content">${groupedTasks()}</div>
+        <div class="selection-footer">
+          <span class="selection-count">已选 ${state.selected.length} 件${state.selected.length === 3 ? " · 已到上限" : ""}</span>
+          <span class="spacer"></span>
+          <button type="button" class="plain-action" data-action="clear-select">清空</button>
+          <button type="button" class="primary-action" data-action="start-focus" ${state.selected.length === 0 ? "disabled" : ""}>${isAdjusting ? "完成调整" : "开始专注"}</button>
+        </div>
+      </div>`;
+    }
+
+    function taskById(id) { return tasks.find(task => task.id === id); }
+
+    function focusPanel(forceDone) {
+      if (forceDone) state.selected.forEach(id => state.completed.add(id));
+      const ordered = state.selected.map(taskById).filter(Boolean);
+      const current = ordered.find(task => !state.completed.has(task.id));
+      let body = "";
+
+      if (current) {
+        const currentMarkup = `<div class="current-task focus-task" data-id="${current.id}">
+          <button type="button" class="focus-check" data-action="toggle-complete" data-id="${current.id}" aria-label="完成当前任务"></button>
+          <div class="current-copy"><small>当前任务</small>${current.text}</div>
+        </div>`;
+
+        const rest = ordered.filter(task => task.id !== current.id).map(task => {
+          const completed = state.completed.has(task.id);
+          return `<div class="focus-next focus-task ${completed ? "completed" : ""}" data-id="${task.id}">
+            <button type="button" class="focus-check" data-action="toggle-complete" data-id="${task.id}" aria-label="${completed ? "取消完成" : "完成任务"}"></button>
+            <div class="focus-text">${task.text}</div>
+          </div>`;
+        }).join("");
+
+        body = `${currentMarkup}<div class="next-block"><p class="next-label">随后</p>${rest}</div>`;
+      } else {
+        body = `${ordered.map(task => `<div class="focus-next focus-task completed" data-id="${task.id}">
+          <button type="button" class="focus-check" data-action="toggle-complete" data-id="${task.id}" aria-label="取消完成"></button>
+          <div class="focus-text">${task.text}</div>
+        </div>`).join("")}<div class="all-done">今天的重要事项已经完成<br>轻提醒已停止</div>`;
+      }
+
+      const capture = state.captureOpen ? `<div class="capture"><span class="check"></span><input id="captureInput" type="text" maxlength="80" placeholder="输入待办，按 Enter 保存" aria-label="快速新增待办"></div>` : "";
+      const toast = state.toastVisible ? `<div class="toast">已加入短期任务 <button type="button" data-action="adjust">调整今日专注</button></div>` : "";
+      return `<div class="panel" data-screen-label="今日专注视图">${panelHeader("focus")}${capture}<div class="focus-content">${body}</div>${toast}</div>`;
+    }
+
+    function reminderView() {
+      const focusReminder = state.reminderType === "focus";
+      const current = state.selected.map(taskById).find(task => task && !state.completed.has(task.id)) || taskById(state.selected[0]) || tasks[0];
+      const currentIndex = state.selected.findIndex(id => !state.completed.has(id));
+      const progressIndex = currentIndex >= 0 ? currentIndex + 1 : (state.selected.length || 1);
+      const progress = `${progressIndex}/${state.selected.length || 1}`;
+      return `<div class="reminder-wrap" data-screen-label="专注提醒浮窗">
+        <div class="reminder ${focusReminder ? "" : "exact"}">
+          <div class="reminder-top">
+            <span class="reminder-kicker">${focusReminder ? "当前专注" : "定时提醒"}</span>
+            <span class="reminder-progress">${focusReminder ? progress : "今天 15:30"}</span>
+            <button type="button" class="reminder-close" data-action="close-reminder" aria-label="关闭提醒">×</button>
+          </div>
+          <div class="reminder-body" data-action="open-focus">
+            <span class="focus-check"></span>
+            <span class="reminder-text">${focusReminder ? current.text : tasks[1].text}</span>
+          </div>
+          <p class="reminder-note">${focusReminder ? "悬停可暂停" : "这是你为此任务设置的明确时间"}</p>
+        </div>
+        <div class="reminder-switch">
+          <button type="button" class="${focusReminder ? "active" : ""}" data-action="reminder-focus">专注轻提醒</button>
+          <button type="button" class="${focusReminder ? "" : "active"}" data-action="reminder-exact">单任务定时提醒</button>
+        </div>
+      </div>`;
+    }
+
+    function setScenario(next) {
+      state.scenario = next;
+      if (["focus", "done", "reminder"].includes(next)) state.focusStarted = true;
+      if (next === "done") state.selected.forEach(id => state.completed.add(id));
+      if (next === "focus" && state.completed.size === state.selected.length) state.completed.clear();
+      render();
+    }
+
+    function beginSelection(origin) {
+      state.selectionOrigin = origin;
+      state.selectionSnapshot = [...state.selected];
+      state.scenario = "select";
+      render();
+    }
+
+    function cancelSelection() {
+      state.selected = [...state.selectionSnapshot];
+      state.scenario = state.selectionOrigin === "focus" ? "focus" : "list";
+      render();
+    }
+
+    function renderNotes() {
+      const info = scenarioNotes[state.scenario];
+      noteIndex.textContent = info.index;
+      noteTitle.textContent = info.title;
+      noteCopy.textContent = info.copy;
+      principles.innerHTML = info.principles.map(item => `<li><strong>${item[0]}</strong>${item[1]}</li>`).join("");
+      interactionTip.textContent = info.tip;
+      if (state.scenario === "list" && state.focusStarted) {
+        noteTitle.textContent = "查看全部后，一键继续专注";
+        noteCopy.textContent = "“全部”只切换到完整清单，不结束当天专注。普通清单保留“继续专注”入口，并用序号标出今天已经选定的任务。";
+        interactionTip.textContent = "可点击“继续专注”直接返回原专注页。";
+      }
+      if (state.scenario === "select" && state.selectionOrigin === "focus") {
+        noteTitle.textContent = "调整后直接返回专注";
+        noteCopy.textContent = "调整是专注过程中的临时编辑状态。“完成调整”保存并返回专注页；“取消”恢复调整前的任务和顺序，也返回专注页。";
+        interactionTip.textContent = "修改任务后点击“完成调整”，或点击“取消”原样返回。";
+      }
+    }
+
+    function render() {
+      document.querySelectorAll(".scenario-button").forEach(item => {
+        item.setAttribute("aria-selected", String(item.dataset.scenario === state.scenario));
+      });
+
+      if (state.scenario === "list") stage.innerHTML = listPanel();
+      if (state.scenario === "select") stage.innerHTML = selectionPanel();
+      if (state.scenario === "focus") stage.innerHTML = focusPanel(false);
+      if (state.scenario === "done") stage.innerHTML = focusPanel(true);
+      if (state.scenario === "reminder") stage.innerHTML = reminderView();
+
+      const remaining = state.selected.filter(id => !state.completed.has(id)).length;
+      menuBarText.textContent = state.focusStarted
+        ? (remaining > 0 ? `专注 ${remaining}` : "专注 ✓")
+        : "待办 6";
+      renderNotes();
+
+      const captureInput = document.getElementById("captureInput");
+      if (captureInput) requestAnimationFrame(() => captureInput.focus());
+    }
+
+    document.querySelector(".scenario-nav").addEventListener("click", event => {
+      const target = event.target.closest("[data-scenario]");
+      if (!target) return;
+      if (target.dataset.scenario === "select") {
+        beginSelection(state.focusStarted ? "focus" : "list");
+        return;
+      }
+      setScenario(target.dataset.scenario);
+    });
+
+    stage.addEventListener("click", event => {
+      const target = event.target.closest("[data-action]");
+      if (!target) return;
+      const action = target.dataset.action;
+      const id = Number(target.dataset.id);
+
+      if (action === "enter-select") beginSelection("list");
+      if (action === "adjust") beginSelection("focus");
+      if (action === "continue-focus") setScenario("focus");
+      if (action === "cancel-select") cancelSelection();
+      if (action === "show-list") setScenario("list");
+      if (action === "start-focus") {
+        state.focusStarted = true;
+        setScenario("focus");
+      }
+      if (action === "clear-select") { state.selected = []; render(); }
+      if (action === "toggle-select") {
+        if (state.scenario !== "select") return;
+        if (state.selected.includes(id)) state.selected = state.selected.filter(item => item !== id);
+        else if (state.selected.length < 3) state.selected = [...state.selected, id];
+        render();
+      }
+      if (action === "toggle-complete") {
+        if (state.completed.has(id)) state.completed.delete(id); else state.completed.add(id);
+        state.scenario = state.completed.size === state.selected.length ? "done" : "focus";
+        render();
+      }
+      if (action === "capture") { state.captureOpen = !state.captureOpen; state.toastVisible = false; render(); }
+      if (action === "reminder-focus") { state.reminderType = "focus"; render(); }
+      if (action === "reminder-exact") { state.reminderType = "exact"; render(); }
+      if (action === "open-focus") setScenario("focus");
+      if (action === "close-reminder") setScenario("focus");
+    });
+
+    stage.addEventListener("keydown", event => {
+      if (event.target.id === "captureInput" && event.key === "Enter" && event.target.value.trim()) {
+        state.captureOpen = false;
+        state.toastVisible = true;
+        render();
+        window.setTimeout(() => {
+          state.toastVisible = false;
+          if (state.scenario === "focus") render();
+        }, 2600);
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

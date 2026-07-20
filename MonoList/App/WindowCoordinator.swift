@@ -43,8 +43,10 @@ final class WindowCoordinator {
 
     var onOpenSettings: (() -> Void)?
     var onWillShowMainPanel: (() -> Void)?
+    var onFocusInteraction: (() -> Void)?
 
     private let taskStore: TaskStore
+    private let focusStore: FocusStore
     private let draftState = TaskDraftState()
     private var mainPanel: MainPanel?
     private var globalOutsideClickMonitor: Any?
@@ -70,8 +72,9 @@ final class WindowCoordinator {
         settingsWindow?.isVisible == true
     }
 
-    init(taskStore: TaskStore) {
+    init(taskStore: TaskStore, focusStore: FocusStore) {
         self.taskStore = taskStore
+        self.focusStore = focusStore
     }
 
     static func preferredMainPanelHeight(
@@ -357,14 +360,16 @@ final class WindowCoordinator {
     }
 
     private func makeMainPanel() -> MainPanel {
-        let initialHeight = max(
-            148,
-            Self.preferredMainPanelHeight(
-                pendingCount: taskStore.pendingTasks.count,
-                todayCompletedCount: taskStore.completedTasks(on: Date()).count,
-                olderVisibleCount: 0
+        let initialHeight = focusStore.isActive()
+            ? 348
+            : max(
+                148,
+                Self.preferredMainPanelHeight(
+                    pendingCount: taskStore.pendingTasks.count,
+                    todayCompletedCount: taskStore.completedTasks(on: Date()).count,
+                    olderVisibleCount: 0
+                )
             )
-        )
         let panel = MainPanel(
             contentRect: NSRect(
                 x: 0,
@@ -390,6 +395,7 @@ final class WindowCoordinator {
         let hostingView = MainPanelHostingView(
             rootView: TaskListView(
                 store: taskStore,
+                focusStore: focusStore,
                 draftState: draftState,
                 onClose: { [weak self] in
                     self?.closeMainPanel(restoringFocus: true)
@@ -397,6 +403,9 @@ final class WindowCoordinator {
                 onOpenSettings: { [weak self] in
                     self?.closeMainPanel()
                     self?.onOpenSettings?()
+                },
+                onFocusInteraction: { [weak self] in
+                    self?.onFocusInteraction?()
                 },
                 onHeightChanged: { [weak self, weak panel] height in
                     guard let self, let panel else { return }

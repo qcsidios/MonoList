@@ -10,6 +10,7 @@ struct TaskRowView: View {
     let onInsertAfter: () -> Void
     let onUpdateReminder: (TaskReminder?) -> Void
     let onChangeGroup: () -> Void
+    let focusOrder: Int?
     let isSelected: Bool
     let onSelect: () -> Void
     let onEditingChanged: (Bool) -> Void
@@ -31,6 +32,7 @@ struct TaskRowView: View {
         onInsertAfter: @escaping () -> Void,
         onUpdateReminder: @escaping (TaskReminder?) -> Void,
         onChangeGroup: @escaping () -> Void,
+        focusOrder: Int? = nil,
         isSelected: Bool,
         onSelect: @escaping () -> Void,
         onEditingChanged: @escaping (Bool) -> Void
@@ -44,6 +46,7 @@ struct TaskRowView: View {
         self.onInsertAfter = onInsertAfter
         self.onUpdateReminder = onUpdateReminder
         self.onChangeGroup = onChangeGroup
+        self.focusOrder = focusOrder
         self.isSelected = isSelected
         self.onSelect = onSelect
         self.onEditingChanged = onEditingChanged
@@ -56,10 +59,20 @@ struct TaskRowView: View {
             Button {
                 onComplete(text)
             } label: {
-                Image(systemName: "circle")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
+                Group {
+                    if let focusOrder {
+                        Text("\(focusOrder)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 19, height: 19)
+                            .background(Color.primary, in: Circle())
+                    } else {
+                        Image(systemName: "circle")
+                            .font(.system(size: 18, weight: .regular))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
             .help("标记为完成")

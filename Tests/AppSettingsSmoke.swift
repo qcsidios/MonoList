@@ -10,7 +10,7 @@ struct AppSettingsSmoke {
         let settings = AppSettings(fileURL: fileURL)
 
         precondition(settings.reminderEnabled)
-        precondition(settings.reminderIntervalMinutes == 30)
+        precondition(settings.reminderIntervalMinutes == 60)
         precondition(settings.reminderStartMinuteOfDay == 9 * 60)
         precondition(settings.reminderEndMinuteOfDay == 22 * 60)
         precondition(settings.reminderPosition == .topCenter)

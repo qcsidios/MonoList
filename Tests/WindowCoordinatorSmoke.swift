@@ -10,7 +10,10 @@ struct WindowCoordinatorSmoke {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MonoListWindowTests-\(UUID().uuidString)")
         let store = TaskStore(fileURL: directory.appendingPathComponent("tasks.json"))
-        let coordinator = WindowCoordinator(taskStore: store)
+        let focusStore = FocusStore(
+            fileURL: directory.appendingPathComponent("focus.json")
+        )
+        let coordinator = WindowCoordinator(taskStore: store, focusStore: focusStore)
 
         precondition(WindowCoordinator.mainPanelWidth == 336)
         precondition(WindowCoordinator.mainPanelMaximumHeight == 447)

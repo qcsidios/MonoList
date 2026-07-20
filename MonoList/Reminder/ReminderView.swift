@@ -7,6 +7,8 @@ final class ReminderPresentationModel: ObservableObject {
 }
 
 struct ReminderView: View {
+    var title = "待办提醒"
+    var statusText: String?
     let totalCount: Int
     let taskTexts: [String]
     @ObservedObject var model: ReminderPresentationModel
@@ -16,10 +18,10 @@ struct ReminderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("待办提醒")
+                Text(title)
                     .font(.headline)
                 Spacer()
-                Text("\(totalCount) 项")
+                Text(statusText ?? "\(totalCount) 项")
                     .foregroundStyle(.secondary)
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -45,7 +47,7 @@ struct ReminderView: View {
             }
             .buttonStyle(.plain)
 
-            Text("\(model.remainingSeconds) 秒后收回")
+            Text("悬停可暂停")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

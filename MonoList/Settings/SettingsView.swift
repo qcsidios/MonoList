@@ -104,6 +104,10 @@ struct SettingsView: View {
                 .labelsHidden()
                 .toggleStyle(SettingsSwitchStyle())
             }
+            Text("设置今日专注后，轻提醒只提示当前任务。")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             settingsRow("提醒声音") {
                 SettingsPopupButton(
                     items: ["关闭"] + Self.systemSoundNames,

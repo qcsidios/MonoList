@@ -58,7 +58,7 @@ struct ShortcutDefinition: Codable, Equatable {
 
 struct SettingsValues: Codable, Equatable {
     var reminderEnabled = true
-    var reminderIntervalMinutes = 30
+    var reminderIntervalMinutes = 60
     var reminderStartMinuteOfDay = 9 * 60
     var reminderEndMinuteOfDay = 22 * 60
     var reminderPosition = ReminderPosition.topCenter
@@ -92,7 +92,7 @@ struct SettingsValues: Codable, Equatable {
         reminderIntervalMinutes = try container.decodeIfPresent(
             Int.self,
             forKey: .reminderIntervalMinutes
-        ) ?? 30
+        ) ?? 60
         reminderStartMinuteOfDay = try container.decodeIfPresent(
             Int.self,
             forKey: .reminderStartMinuteOfDay

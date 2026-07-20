@@ -54,15 +54,17 @@ final class ReminderScheduler: ObservableObject {
         intervalMinutes: Int,
         startMinuteOfDay: Int = 9 * 60,
         endMinuteOfDay: Int = 22 * 60,
-        pendingTasks: [TaskItem]
+        pendingTasks: [TaskItem],
+        lightReminderTasks: [TaskItem]? = nil
     ) {
         self.pendingTasks = pendingTasks
+        let reminderTasks = lightReminderTasks ?? pendingTasks
         configureGlobalSchedule(
             enabled: enabled,
             intervalMinutes: intervalMinutes,
             startMinuteOfDay: startMinuteOfDay,
             endMinuteOfDay: endMinuteOfDay,
-            pendingCount: pendingTasks.count
+            pendingCount: reminderTasks.count
         )
     }
 
@@ -116,6 +118,16 @@ final class ReminderScheduler: ObservableObject {
         }
     }
 
+    func meaningfulInteraction(pendingCount: Int) {
+        self.pendingCount = pendingCount
+        if enabled && pendingCount > 0 {
+            restart()
+        } else {
+            deadline = nil
+            nextReminderDate = nil
+        }
+    }
+
     func evaluate(interfaceBusy: Bool) {
         if enabled,
            let dedicatedTask = Self.dueDedicatedReminderTask(
@@ -131,6 +143,10 @@ final class ReminderScheduler: ObservableObject {
             if !dispatchedDedicatedReminderKeys.contains(key) {
                 dispatchedDedicatedReminderKeys.insert(key)
                 onDedicatedReminderDue(dedicatedTask.id)
+                if pendingCount > 0 {
+                    restart()
+                }
+                return
             }
         }
 

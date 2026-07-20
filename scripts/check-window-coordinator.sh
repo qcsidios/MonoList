@@ -11,6 +11,7 @@ swiftc \
   -parse-as-library \
   "$ROOT_DIR/MonoList/App/WindowCoordinator.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskItem.swift" \
+  "$ROOT_DIR/MonoList/Tasks/FocusStore.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskStore.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskDropCoordinator.swift" \
   "$ROOT_DIR/MonoList/Tasks/TaskListView.swift" \

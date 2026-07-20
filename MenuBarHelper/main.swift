@@ -16,6 +16,15 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             .dropFirst(2)
             .first
             .flatMap(Int.init) ?? 0
+        let focusRemaining = ProcessInfo.processInfo.arguments
+            .dropFirst(3)
+            .first
+            .flatMap(Int.init)
+            .flatMap { $0 >= 0 ? $0 : nil }
+        let currentFocusText = ProcessInfo.processInfo.arguments
+            .dropFirst(4)
+            .first
+            .flatMap { $0.isEmpty ? nil : $0 }
 
         let item = NSStatusBar.system.statusItem(
             withLength: NSStatusItem.variableLength
@@ -24,8 +33,14 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
         item.isVisible = true
         item.button?.image = MenuBarIconRenderer.makeImage()
         item.button?.imagePosition = .imageLeading
-        item.button?.title = MenuBarBridgeProtocol.title(pendingCount: count)
-        item.button?.toolTip = "MonoList"
+        item.button?.title = MenuBarBridgeProtocol.title(
+            pendingCount: count,
+            focusRemainingCount: focusRemaining
+        )
+        item.button?.toolTip = MenuBarBridgeProtocol.toolTip(
+            currentFocusText: currentFocusText,
+            focusCompleted: focusRemaining == 0
+        )
         item.button?.target = self
         item.button?.action = #selector(statusItemClicked(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -41,8 +56,18 @@ final class MenuBarHelperDelegate: NSObject, NSApplicationDelegate {
             guard let countNumber = notification.userInfo?["count"] as? NSNumber else {
                 return
             }
+            let focusRemainingNumber = notification.userInfo?["focusRemaining"] as? NSNumber
+            let focusRemaining = focusRemainingNumber?.intValue
+            let currentFocusText = notification.userInfo?["currentFocusText"] as? String
             self?.statusItem?.button?.title =
-                MenuBarBridgeProtocol.title(pendingCount: countNumber.intValue)
+                MenuBarBridgeProtocol.title(
+                    pendingCount: countNumber.intValue,
+                    focusRemainingCount: focusRemaining
+                )
+            self?.statusItem?.button?.toolTip = MenuBarBridgeProtocol.toolTip(
+                currentFocusText: currentFocusText,
+                focusCompleted: focusRemaining == 0
+            )
             DispatchQueue.main.async { [weak self] in
                 self?.reportStatusItemFrameIfNeeded()
             }
