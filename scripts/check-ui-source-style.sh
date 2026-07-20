@@ -149,13 +149,8 @@ if grep -q 'event.window !== panel && event.window?.level != .statusBar' "$WINDO
   exit 1
 fi
 
-FOCUS_HEADER_BLOCK="$(awk '
-  /private var focusHeader/ { capture = 1 }
-  /private var focusCaptureRow/ { capture = 0 }
-  capture { print }
-' "$TASK_LIST")"
-if ! echo "$FOCUS_HEADER_BLOCK" | grep -q 'onOpenSettings()'; then
-  echo "今日专注页必须保留控制台入口。" >&2
+if grep -qE 'MainContentMode|返回专注|开始专注|完成调整' "$TASK_LIST"; then
+  echo "今日专注必须与普通待办共用一个窗口，不能恢复页面切换流程。" >&2
   exit 1
 fi
 
@@ -169,9 +164,32 @@ if echo "$FOCUS_TASK_BLOCK" | grep -q 'Color.accentColor'; then
   exit 1
 fi
 
-if ! grep -q 'try focusStore.clearSelection()' "$TASK_LIST" ||
-   ! grep -q 'return "结束专注"' "$TASK_LIST"; then
-  echo "清空今日专注后必须能够保存并结束专注。" >&2
+if echo "$FOCUS_TASK_BLOCK" | grep -q 'HStack(alignment: .top'; then
+  echo "专注任务的完成圆圈必须相对整条任务垂直居中。" >&2
+  exit 1
+fi
+
+if [[ "$(echo "$FOCUS_TASK_BLOCK" | grep -c 'focusEditableText(')" -lt 2 ]]; then
+  echo "当前任务和接下来任务都必须保留原位编辑能力。" >&2
+  exit 1
+fi
+
+for contract in \
+  'private var focusSection' \
+  'private var otherTasksDisclosure' \
+  'private var focusPicker' \
+  'private func toggleFocusMembership' \
+  'private func clearFocusSelection'; do
+  if ! grep -q "$contract" "$TASK_LIST"; then
+    echo "单窗口专注缺少必要交互：$contract" >&2
+    exit 1
+  fi
+done
+
+if ! grep -q 'showsOtherTasks = false' "$TASK_LIST" ||
+   ! grep -q 'focusPickerPresented = false' "$TASK_LIST" ||
+   ! grep -q 'try focusStore.clearSelection()' "$TASK_LIST"; then
+  echo "专注任务必须即时生效，并能在同一窗口清空。" >&2
   exit 1
 fi
 

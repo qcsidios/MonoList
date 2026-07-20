@@ -108,15 +108,9 @@ struct WindowCoordinatorSmoke {
             for: Array(focusTasks.prefix(1))
         )
         let threeFocusHeight = TaskListView.focusContentHeight(for: focusTasks)
-        precondition(oneFocusHeight == 155)
+        precondition(oneFocusHeight == 216)
         precondition(threeFocusHeight > oneFocusHeight)
         precondition(threeFocusHeight < 348)
-        precondition(
-            TaskListView.focusContentHeight(
-                for: Array(focusTasks.prefix(1)),
-                showsCapture: true
-            ) == oneFocusHeight + 44
-        )
         precondition(
             TaskListView.additionalLines(
                 for: "shotlens升级。线上部署，把key放入安全环境。控制台 UI比例调整。"

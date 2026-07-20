@@ -4,11 +4,13 @@ import SwiftUI
 struct TaskTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var isFocused: Bool
+    var fontSize: CGFloat = NSFont.systemFontSize
+    var fontWeight: NSFont.Weight = .regular
     let onSubmit: () -> Void
 
     func makeNSView(context: Context) -> TaskSubmitTextView {
         let view = TaskSubmitTextView()
-        view.font = .systemFont(ofSize: NSFont.systemFontSize)
+        view.font = .systemFont(ofSize: fontSize, weight: fontWeight)
         view.isRichText = false
         view.drawsBackground = false
         view.isHorizontallyResizable = false
@@ -25,6 +27,7 @@ struct TaskTextEditor: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TaskSubmitTextView, context: Context) {
+        view.font = .systemFont(ofSize: fontSize, weight: fontWeight)
         if view.string != text {
             view.string = text
             view.invalidateIntrinsicContentSize()
